@@ -58,7 +58,7 @@ func _on_record_pressed() -> void:
 	
 	is_recording = not is_recording
 
-func _on_obs_updated(obs_data: Dictionary) -> void:
+func _on_obs_updated(obs_data_string: String) -> void:
 	pass
 
 ###############################################################################

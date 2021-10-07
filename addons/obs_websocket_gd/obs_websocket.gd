@@ -1,7 +1,7 @@
 tool
 extends Control
 
-signal obs_updated(update_data)
+signal obs_updated(update_data_string)
 
 const URL_PATH: String = "ws://127.0.0.1:4444"
 
@@ -67,7 +67,7 @@ func _on_data_received() -> void:
 	if json_response.has("update-type") and json_response["update-type"] == "StreamStatus":
 		return
 
-	print(message)
+	emit_signal("obs_updated", message)
 
 func _on_server_close_request(_code: int, _reason: String) -> void:
 	print("OBS close request received")
