@@ -1,0 +1,69 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://addons/obs_websocket_gd/obs_ui.gd" type="Script" id=1]
+
+[node name="ObsUi" type="PanelContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource( 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 1017.0
+margin_bottom = 593.0
+
+[node name="SourceItems" type="HBoxContainer" parent="VBoxContainer"]
+margin_right = 1010.0
+margin_bottom = 82.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer"]
+margin_top = 86.0
+margin_right = 1010.0
+margin_bottom = 90.0
+mouse_filter = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
+margin_top = 94.0
+margin_right = 1010.0
+margin_bottom = 586.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+size_flags_stretch_ratio = 6.0
+
+[node name="Scenes" type="VBoxContainer" parent="VBoxContainer/HBoxContainer"]
+margin_right = 334.0
+margin_bottom = 492.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Sources" type="VBoxContainer" parent="VBoxContainer/HBoxContainer"]
+margin_left = 338.0
+margin_right = 672.0
+margin_bottom = 492.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Controls" type="VBoxContainer" parent="VBoxContainer/HBoxContainer"]
+margin_left = 676.0
+margin_right = 1010.0
+margin_bottom = 492.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Stream" type="Button" parent="VBoxContainer/HBoxContainer/Controls"]
+margin_right = 334.0
+margin_bottom = 20.0
+text = "Start Streaming"
+
+[node name="Record" type="Button" parent="VBoxContainer/HBoxContainer/Controls"]
+margin_top = 24.0
+margin_right = 334.0
+margin_bottom = 44.0
+text = "Start Recording"
