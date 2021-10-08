@@ -38,32 +38,80 @@ size_flags_vertical = 3
 size_flags_stretch_ratio = 6.0
 
 [node name="Scenes" type="VBoxContainer" parent="VBoxContainer/HBoxContainer"]
-margin_right = 334.0
+margin_right = 249.0
 margin_bottom = 492.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="Sources" type="VBoxContainer" parent="VBoxContainer/HBoxContainer"]
-margin_left = 338.0
-margin_right = 672.0
+margin_left = 253.0
+margin_right = 503.0
 margin_bottom = 492.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="Controls" type="VBoxContainer" parent="VBoxContainer/HBoxContainer"]
-margin_left = 676.0
-margin_right = 1010.0
+margin_left = 507.0
+margin_right = 756.0
 margin_bottom = 492.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="Stream" type="Button" parent="VBoxContainer/HBoxContainer/Controls"]
-margin_right = 334.0
+margin_right = 249.0
 margin_bottom = 20.0
 text = "Start Streaming"
 
 [node name="Record" type="Button" parent="VBoxContainer/HBoxContainer/Controls"]
 margin_top = 24.0
-margin_right = 334.0
+margin_right = 249.0
 margin_bottom = 44.0
 text = "Start Recording"
+
+[node name="Websocket" type="VBoxContainer" parent="VBoxContainer/HBoxContainer"]
+margin_left = 760.0
+margin_right = 1010.0
+margin_bottom = 492.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Host" type="HBoxContainer" parent="VBoxContainer/HBoxContainer/Websocket"]
+margin_right = 250.0
+margin_bottom = 24.0
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer/Websocket/Host"]
+margin_top = 5.0
+margin_right = 123.0
+margin_bottom = 19.0
+size_flags_horizontal = 3
+text = "Host:"
+
+[node name="Value" type="LineEdit" parent="VBoxContainer/HBoxContainer/Websocket/Host"]
+margin_left = 127.0
+margin_right = 250.0
+margin_bottom = 24.0
+size_flags_horizontal = 3
+
+[node name="Port" type="HBoxContainer" parent="VBoxContainer/HBoxContainer/Websocket"]
+margin_top = 28.0
+margin_right = 250.0
+margin_bottom = 52.0
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer/Websocket/Port"]
+margin_top = 5.0
+margin_right = 123.0
+margin_bottom = 19.0
+size_flags_horizontal = 3
+text = "Port:"
+
+[node name="Value" type="LineEdit" parent="VBoxContainer/HBoxContainer/Websocket/Port"]
+margin_left = 127.0
+margin_right = 250.0
+margin_bottom = 24.0
+size_flags_horizontal = 3
+
+[node name="Connect" type="Button" parent="VBoxContainer/HBoxContainer/Websocket"]
+margin_top = 56.0
+margin_right = 250.0
+margin_bottom = 76.0
+text = "Connect"
