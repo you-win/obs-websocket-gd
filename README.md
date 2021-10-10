@@ -1,5 +1,5 @@
-# OBS Websocket GD
-A Godot addon to interact with obs-websocket. Tested on Godot 3.4.
+# ![](obs_godot_icon.png) OBS Websocket GD
+A Godot addon to interact with [obs-websocket](https://github.com/Palakis/obs-websocket). Tested on Godot 3.4.
 
 ## Editor Plugin Quickstart
 1. Install [obs-websocket](https://github.com/Palakis/obs-websocket) for your platform
@@ -20,4 +20,3 @@ A Godot addon to interact with obs-websocket. Tested on Godot 3.4.
 
 ## Discussion
 A Discord server [is available here](https://discord.gg/6mcdWWBkrr) if you need help, like to contribute, or just want to chat.
-
