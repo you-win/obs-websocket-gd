@@ -12,7 +12,7 @@ config_version=4
 
 config/name="OBS Websocket GD"
 run/main_scene="res://examples/demo.tscn"
-config/icon="res://icon.png"
+config/icon="res://obs_godot_icon.png"
 
 [physics]
 

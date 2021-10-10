@@ -7,13 +7,28 @@ signal obs_scene_list_returned(data)
 
 class ObsObject:
 	var obs_name: String = "changeme"
+	
+	func _to_string() -> String:
+		return obs_name
 
 class ObsGetSceneListResponse:
 	var current_scene: String
 	var scenes: Array = [] # ObsScene
+	
+	func _to_string() -> String:
+		return str({
+			"current_scene": current_scene,
+			"scenes": scenes
+		})
 
 class ObsScene extends ObsObject:
 	var sources: Array = [] # ObsSceneItem
+	
+	func _to_string() -> String:
+		return str({
+			"obs_name": obs_name,
+			"sources": sources
+		})
 
 class ObsSceneItem extends ObsObject:
 	var cy: float
@@ -25,7 +40,7 @@ class ObsSceneItem extends ObsObject:
 	var locked: bool
 	var source_cx: float
 	var source_cy: float
-	var obs_type: ObsSourceType
+	var obs_type: String
 	var volume: float
 	var x: float
 	var y: float
@@ -44,7 +59,7 @@ class ObsSceneItem extends ObsObject:
 		p_locked: bool,
 		p_source_cx: float,
 		p_source_cy: float,
-		p_obs_type: ObsSourceType,
+		p_obs_type: String,
 		p_volume: float,
 		p_x: float,
 		p_y: float,
@@ -67,18 +82,24 @@ class ObsSceneItem extends ObsObject:
 		y = p_y
 		# parent_group_name = p_parent_group_name
 		# group_children = p_group_children
-
-class ObsSourceType:
-	const INPUT = "input"
-	const FILTER = "filter"
-	const TRANSTIION = "transition"
-	const SCENE = "scene"
-	const UNKNOWN = "unknown"
 	
-	var current_type: String = UNKNOWN
-	
-	func _init(p_type: String):
-		current_type = p_type
+	func _to_string() -> String:
+		return str({
+			"cy": cy,
+			"cx": cx,
+			"alignment": alignment,
+			"obs_name": obs_name,
+			"id": id,
+			"render": render,
+			"muted": muted,
+			"locked": locked,
+			"source_cx": source_cx,
+			"source_cy": source_cy,
+			"obs_type": obs_type,
+			"volume": volume,
+			"x": x,
+			"y": y
+		})
 
 const URL_PATH: String = "ws://%s:%s"
 
@@ -91,6 +112,7 @@ var request_counter: int = -1
 
 export var host: String = "127.0.0.1"
 export var port: String = "4444"
+export var password: String = "password" # It's plaintext lmao, you should be changing this programmatically
 
 const PreconfiguredCommands = {
 	"GET_SCENE_LIST": "GetSceneList"
@@ -146,7 +168,7 @@ func _on_data_received() -> void:
 		return
 	
 	if json_response.has("authRequired"):
-		var secret_combined: String = "%s%s" % ["password", json_response["salt"]]
+		var secret_combined: String = "%s%s" % [password, json_response["salt"]]
 		var secret_base64 = Marshalls.raw_to_base64(secret_combined.sha256_buffer())
 		var auth_combined: String = "%s%s" % [secret_base64, json_response["challenge"]]
 		var auth_base64: String = Marshalls.raw_to_base64(auth_combined.sha256_buffer())
@@ -167,6 +189,7 @@ func _on_data_received() -> void:
 					
 					for i in json_response["scenes"]:
 						var obs_scene := ObsScene.new()
+						obs_scene.obs_name = i["name"]
 						for j in i["sources"]:
 							var obs_scene_item := ObsSceneItem.new(
 								j["cy"],
@@ -187,6 +210,7 @@ func _on_data_received() -> void:
 							obs_scene.sources.append(obs_scene_item)
 						data.scenes.append(obs_scene)
 					emit_signal("obs_scene_list_returned", data)
+					waiting_for_response = false
 					return
 
 	emit_signal("obs_updated", json_response)
