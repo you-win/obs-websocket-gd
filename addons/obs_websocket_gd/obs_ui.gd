@@ -40,6 +40,8 @@ var is_streaming := false
 onready var record: Button = $VBoxContainer/HBoxContainer/Controls/Record
 var is_recording := false
 
+onready var engine_version: Dictionary = Engine.get_version_info()
+
 ###############################################################################
 # Builtin functions                                                           #
 ###############################################################################
@@ -145,7 +147,14 @@ func _on_obs_scene_list_returned(data) -> void:
 		var scene_button := CheckButton.new()
 		scene_button.text = i.obs_name
 		if scene_button.text == current_scene:
-			scene_button.set_pressed_no_signal(true)
+			if engine_version.major == 3:
+				if engine_version.minor >= 4:
+					scene_button.set_pressed_no_signal(true)
+				else:
+					scene_button.pressed = true
+			else:
+				print_debug("Unsupported engine version, exiting")
+				get_tree().quit()
 		scene_button.group = scene_button_group
 		scene_button.connect("toggled", self, "_on_button_toggled_with_name", [scene_button.text, ButtonType.SCENE])
 		scenes.call_deferred("add_child", scene_button)
@@ -182,7 +191,15 @@ func _on_button_toggled_with_name(button_pressed: bool, button_name: String, but
 			# If you remove items in OBS without refreshing data, you might null pointer?
 			for i in scene_data[scene_button_group.get_pressed_button().text].sources:
 				if i.obs_name == button_name:
-					render.set_pressed_no_signal(i.render)
+					if engine_version.major == 3:
+						if engine_version.minor >= 4:
+							render.set_pressed_no_signal(i.render)
+						else:
+							# TODO this might be incorrect
+							render.pressed = i.render
+					else:
+						print_debug("Unsupported engine version, exiting")
+						get_tree().quit()
 
 ###############################################################################
 # Private functions                                                           #
