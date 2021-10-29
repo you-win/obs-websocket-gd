@@ -208,7 +208,7 @@ margin_top = 5.0
 margin_right = 120.0
 margin_bottom = 19.0
 size_flags_horizontal = 3
-text = "Port:"
+text = "Password:"
 
 [node name="Value" type="LineEdit" parent="ObsUi/VBoxContainer/HBoxContainer/Websocket/Password"]
 margin_left = 124.0

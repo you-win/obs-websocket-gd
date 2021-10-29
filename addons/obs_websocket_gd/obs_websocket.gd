@@ -132,9 +132,6 @@ func _ready() -> void:
 	obs_client.connect("server_close_request", self, "_on_server_close_request")
 	
 	obs_client.verify_ssl = false
-	
-	if not Engine.editor_hint:
-		establish_connection()
 
 func _process(delta: float) -> void:
 	poll_counter += delta
@@ -184,6 +181,12 @@ func _on_data_received() -> void:
 		if waiting_for_response:
 			match last_command:
 				PreconfiguredCommands.GET_SCENE_LIST:
+					# Courtesy null check
+					if (not json_response.has("current-scene") or not json_response.has("scenes")):
+						printerr("Invalid response from obs")
+						waiting_for_response = false
+						return
+					
 					var data := ObsGetSceneListResponse.new()
 					data.current_scene = json_response["current-scene"]
 					

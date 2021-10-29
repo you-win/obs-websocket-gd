@@ -177,6 +177,8 @@ func _on_source_item_toggled(button_pressed: bool, button_name: String) -> void:
 
 func _on_button_toggled_with_name(button_pressed: bool, button_name: String, button_type: int) -> void:
 	# Buttons cannot be unpressed with a button group I guess, so just match positives
+	if not button_pressed:
+		return
 	match button_type:
 		ButtonType.SCENE:
 			source_items.visible = false

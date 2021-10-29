@@ -14,6 +14,10 @@ config/name="OBS Websocket GD"
 run/main_scene="res://examples/demo.tscn"
 config/icon="res://obs_godot_icon.png"
 
+[editor_plugins]
+
+enabled=PoolStringArray( "res://addons/obs_websocket_gd/plugin.cfg" )
+
 [physics]
 
 common/enable_pause_aware_picking=true
