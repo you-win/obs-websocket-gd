@@ -177,6 +177,7 @@ func _on_data_received() -> void:
 		return
 	elif json_response.has("update-type") and json_response["update-type"] == "StreamStatus":
 		return
+
 	else:
 		if waiting_for_response:
 			match last_command:
@@ -186,7 +187,8 @@ func _on_data_received() -> void:
 						printerr("Invalid response from obs")
 						waiting_for_response = false
 						return
-					
+
+					last_command = "N/A"
 					var data := ObsGetSceneListResponse.new()
 					data.current_scene = json_response["current-scene"]
 					
