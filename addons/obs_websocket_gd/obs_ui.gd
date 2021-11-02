@@ -25,7 +25,7 @@ onready var scenes: VBoxContainer = $VBoxContainer/HBoxContainer/Scenes/ScenesSc
 var scene_button_group := ButtonGroup.new()
 
 onready var sources: VBoxContainer = $VBoxContainer/HBoxContainer/Sources/SourcesScroll/VBoxContainer
-var source_button_group := ButtonGroup.new()
+var source_buttons := []
 
 onready var connect_button: Button = $VBoxContainer/HBoxContainer/Websocket/Connect
 var is_connection_established := false
@@ -58,7 +58,7 @@ func _ready():
 	port_value.text = obs_websocket.port
 	password_value.text = obs_websocket.password
 	
-	render.connect("toggled", self, "_on_source_item_toggled", [render.text])
+	#render.connect("toggled", self, "_on_source_item_toggled", [render.text])
 	
 	connect_button.connect("pressed", self, "_on_connect_pressed")
 	
@@ -161,20 +161,16 @@ func _on_obs_scene_list_returned(data) -> void:
 		
 		if i.obs_name == current_scene:
 			for j in i.sources:
-				_create_source_button(j.obs_name)
+				_create_source_button(j.obs_name,j.render)
 		
 		scene_data[i.obs_name] = i
 
-func _on_source_item_toggled(button_pressed: bool, button_name: String) -> void:
-	match button_name:
-		"Render":
-			obs_websocket.send_command("SetSceneItemRender", {
-				"source": source_button_group.get_pressed_button().text,
-				"render": button_pressed
-			})
-		_:
-			print("Unhandled source item toggled")
-
+func _on_source_item_toggled(button_render: bool, button_name: String, whatisthis: bool  ) -> void:
+	obs_websocket.send_command("SetSceneItemRender", {
+		"source": button_name,
+		"render": button_render
+	})
+	
 func _on_button_toggled_with_name(button_pressed: bool, button_name: String, button_type: int) -> void:
 	# Buttons cannot be unpressed with a button group I guess, so just match positives
 	if not button_pressed:
@@ -186,7 +182,7 @@ func _on_button_toggled_with_name(button_pressed: bool, button_name: String, but
 			for child in sources.get_children():
 				child.free()
 			for i in scene_data[button_name].sources:
-				_create_source_button(i.obs_name)
+				_create_source_button(i.obs_name, i.render)
 		ButtonType.SOURCE:
 			source_items.visible = true
 			# I like to live dangerously
@@ -207,12 +203,14 @@ func _on_button_toggled_with_name(button_pressed: bool, button_name: String, but
 # Private functions                                                           #
 ###############################################################################
 
-func _create_source_button(button_name: String) -> void:
+func _create_source_button(button_name: String, button_render: bool) -> void:
 	var source_button := CheckButton.new()
 	source_button.text = button_name
-	source_button.group = source_button_group
-	source_button.connect("toggled", self, "_on_button_toggled_with_name", [source_button.text, ButtonType.SOURCE])
+	source_button.set_pressed_no_signal(button_render)
+	source_buttons.append(source_button)
+	source_button.connect("toggled", self, "_on_source_item_toggled", [button_name, button_render])
 	sources.call_deferred("add_child", source_button)
+
 
 ###############################################################################
 # Public functions                                                            #
