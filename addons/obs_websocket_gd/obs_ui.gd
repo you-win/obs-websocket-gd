@@ -128,6 +128,18 @@ func _on_obs_updated(obs_data: Dictionary) -> void:
 		(obs_data["update-type"] == "SceneItemVisibilityChanged" or obs_data["update-type"] == "TransitionEnd")):
 		yield(get_tree(), "idle_frame")
 		_on_refresh_data_pressed()
+	if obs_data.has("recording") and obs_data["recording"]:
+		record.text = STOP_RECORDING
+		is_recording = true
+	else:
+		record.text = START_RECORDING
+		is_recording = false
+	if obs_data.has("streaming") and obs_data["streaming"]:
+		stream.text = STOP_STREAMING
+		is_streaming = true
+	else:
+		stream.text = START_STREAMING
+		is_streaming = false
 	print(obs_data)
 
 
