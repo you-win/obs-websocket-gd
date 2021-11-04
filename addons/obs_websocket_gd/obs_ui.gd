@@ -58,6 +58,8 @@ func _ready():
 	port_value.text = obs_websocket.port
 	password_value.text = obs_websocket.password
 	
+	password_value.connect("text_entered", self, "_on_password_text_entered")
+	
 	connect_button.connect("pressed", self, "_on_connect_pressed")
 	
 	refresh_data.connect("pressed", self, "_on_refresh_data_pressed")
@@ -67,6 +69,8 @@ func _ready():
 	
 	record.text = START_RECORDING
 	record.connect("pressed", self, "_on_record_pressed")
+	
+	
 
 func _exit_tree() -> void:
 	obs_websocket.free()
@@ -74,6 +78,9 @@ func _exit_tree() -> void:
 ###############################################################################
 # Connections                                                                 #
 ###############################################################################
+
+func _on_password_text_entered(kastring)->void:
+	_on_connect_pressed()
 
 func _on_connect_pressed() -> void:
 	if (host_value.text.empty() or port_value.text.empty()):
