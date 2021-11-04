@@ -59,6 +59,7 @@ func _ready():
 	password_value.text = obs_websocket.password
 	
 	password_value.connect("text_entered", self, "_on_password_text_entered")
+	password_value.grab_focus()
 	
 	connect_button.connect("pressed", self, "_on_connect_pressed")
 	
