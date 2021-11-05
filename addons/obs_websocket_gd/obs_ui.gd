@@ -58,6 +58,9 @@ func _ready():
 	port_value.text = obs_websocket.port
 	password_value.text = obs_websocket.password
 	
+	password_value.connect("text_entered", self, "_on_password_text_entered")
+	password_value.grab_focus()
+	
 	connect_button.connect("pressed", self, "_on_connect_pressed")
 	
 	refresh_data.connect("pressed", self, "_on_refresh_data_pressed")
@@ -67,6 +70,8 @@ func _ready():
 	
 	record.text = START_RECORDING
 	record.connect("pressed", self, "_on_record_pressed")
+	
+	
 
 func _exit_tree() -> void:
 	obs_websocket.free()
@@ -74,6 +79,9 @@ func _exit_tree() -> void:
 ###############################################################################
 # Connections                                                                 #
 ###############################################################################
+
+func _on_password_text_entered(kastring)->void:
+	_on_connect_pressed()
 
 func _on_connect_pressed() -> void:
 	if (host_value.text.empty() or port_value.text.empty()):
@@ -120,6 +128,18 @@ func _on_obs_updated(obs_data: Dictionary) -> void:
 		(obs_data["update-type"] == "SceneItemVisibilityChanged" or obs_data["update-type"] == "TransitionEnd")):
 		yield(get_tree(), "idle_frame")
 		_on_refresh_data_pressed()
+	if obs_data.has("recording") and obs_data["recording"]:
+		record.text = STOP_RECORDING
+		is_recording = true
+	else:
+		record.text = START_RECORDING
+		is_recording = false
+	if obs_data.has("streaming") and obs_data["streaming"]:
+		stream.text = STOP_STREAMING
+		is_streaming = true
+	else:
+		stream.text = START_STREAMING
+		is_streaming = false
 	print(obs_data)
 
 

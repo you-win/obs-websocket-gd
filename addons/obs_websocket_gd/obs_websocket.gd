@@ -112,7 +112,7 @@ var request_counter: int = -1
 
 export var host: String = "127.0.0.1"
 export var port: String = "4444"
-export var password: String = "password" # It's plaintext lmao, you should be changing this programmatically
+export var password: String = "" # It's plaintext lmao, you should be changing this programmatically
 
 const PreconfiguredCommands = {
 	"GET_SCENE_LIST": "GetSceneList"
@@ -185,7 +185,6 @@ func _on_data_received() -> void:
 					# Courtesy null check
 					if (not json_response.has("current-scene") or not json_response.has("scenes")):
 						printerr("Invalid response from obs")
-						waiting_for_response = false
 						return
 
 					last_command = "N/A"
