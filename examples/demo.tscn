@@ -215,7 +215,6 @@ margin_left = 124.0
 margin_right = 244.0
 margin_bottom = 24.0
 size_flags_horizontal = 3
-text = "password"
 secret = true
 
 [node name="Connect" type="Button" parent="ObsUi/VBoxContainer/HBoxContainer/Websocket"]
@@ -229,3 +228,7 @@ margin_top = 126.0
 margin_right = 244.0
 margin_bottom = 146.0
 text = "Refresh Data"
+
+[node name="ErrorPopup" type="AcceptDialog" parent="."]
+margin_right = 83.0
+margin_bottom = 58.0

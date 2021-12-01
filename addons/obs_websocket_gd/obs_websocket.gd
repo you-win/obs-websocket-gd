@@ -4,6 +4,7 @@ extends Control
 signal obs_connected()
 signal obs_updated(data)
 signal obs_scene_list_returned(data)
+signal obs_error(error)
 
 class ObsObject:
 	var obs_name: String = "changeme"
@@ -163,6 +164,14 @@ func _on_data_received() -> void:
 	if typeof(json_response) != TYPE_DICTIONARY:
 		print("Invalid json_response: %s" % json_response)
 		return
+		
+	if json_response.has("error"):
+		print("Error: %s" % json_response)
+		emit_signal("obs_error", json_response["error"])
+		
+		match json_response["error"]:
+			"Authentication Failed.":
+				pass
 	
 	if json_response.has("authRequired"):
 		var secret_combined: String = "%s%s" % [password, json_response["salt"]]

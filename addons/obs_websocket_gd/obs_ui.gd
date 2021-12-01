@@ -40,6 +40,8 @@ var is_streaming := false
 onready var record: Button = $VBoxContainer/HBoxContainer/Controls/Record
 var is_recording := false
 
+onready var error_popup : AcceptDialog = get_parent().find_node("ErrorPopup")
+
 onready var engine_version: Dictionary = Engine.get_version_info()
 
 ###############################################################################
@@ -52,6 +54,7 @@ func _ready():
 	obs_websocket.connect("obs_updated", self, "_on_obs_updated")
 	obs_websocket.connect("obs_connected", self, "_on_obs_connected")
 	obs_websocket.connect("obs_scene_list_returned", self, "_on_obs_scene_list_returned")
+	obs_websocket.connect("obs_error", self, "_on_obs_error")
 	
 	# Setup connection values from script
 	host_value.text = obs_websocket.host
@@ -70,6 +73,8 @@ func _ready():
 	
 	record.text = START_RECORDING
 	record.connect("pressed", self, "_on_record_pressed")
+	
+	
 	
 	
 
@@ -142,6 +147,17 @@ func _on_obs_updated(obs_data: Dictionary) -> void:
 				is_streaming = false
 	print(obs_data)
 
+###############################################################################
+# Error Handling                                                              #
+###############################################################################
+
+func _on_obs_error(error_msg) -> void:
+	match error_msg:
+		"Authentication Failed.":
+			obs_websocket.break_connection()
+			connect_button.text = CONNECT_TO_OBS
+			error_popup.dialog_text = "Unable to Authenticate to the OBS websocket server.\n\nIs your password correct?"
+			error_popup.popup_centered()
 
 func _on_obs_connected() -> void:
 	obs_websocket.get_scene_list()
