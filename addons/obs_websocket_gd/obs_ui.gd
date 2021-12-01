@@ -116,30 +116,30 @@ func _on_record_pressed() -> void:
 	match is_recording:
 		true:
 			obs_websocket.send_command("StopRecording")
-			record.text = START_RECORDING
 		false:
 			obs_websocket.send_command("StartRecording")
-			record.text = STOP_RECORDING
 	
-	is_recording = not is_recording
 
 func _on_obs_updated(obs_data: Dictionary) -> void:
 	if (obs_data.has("update-type") and 
 		(obs_data["update-type"] == "SceneItemVisibilityChanged" or obs_data["update-type"] == "TransitionEnd")):
 		yield(get_tree(), "idle_frame")
 		_on_refresh_data_pressed()
-	if obs_data.has("recording") and obs_data["recording"]:
-		record.text = STOP_RECORDING
-		is_recording = true
-	else:
-		record.text = START_RECORDING
-		is_recording = false
-	if obs_data.has("streaming") and obs_data["streaming"]:
-		stream.text = STOP_STREAMING
-		is_streaming = true
-	else:
-		stream.text = START_STREAMING
-		is_streaming = false
+
+	if obs_data.has("update-type"):
+		match obs_data["update-type"]:
+			"RecordingStarted":
+				record.text = STOP_RECORDING
+				is_recording = true
+			"RecordingStopped":
+				record.text = START_RECORDING
+				is_recording = false
+			"StreamingStarted":
+				stream.text = STOP_STREAMING
+				is_streaming = true
+			"StreamingStopped":
+				stream.text = START_STREAMING
+				is_streaming = false
 	print(obs_data)
 
 
