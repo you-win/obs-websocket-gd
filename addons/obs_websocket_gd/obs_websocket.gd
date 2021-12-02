@@ -150,6 +150,7 @@ func _on_connection_closed(_was_clean_close: bool) -> void:
 
 func _on_connection_error() -> void:
 	print("OBS connection error")
+	emit_signal("obs_error", "Connection Error.")
 
 func _on_connection_established(_protocol: String) -> void:
 	print("OBS connection established")
@@ -166,12 +167,8 @@ func _on_data_received() -> void:
 		return
 		
 	if json_response.has("error"):
-		print("Error: %s" % json_response)
+		print("Error: %s" % json_response["error"])
 		emit_signal("obs_error", json_response["error"])
-		
-		match json_response["error"]:
-			"Authentication Failed.":
-				pass
 	
 	if json_response.has("authRequired"):
 		var secret_combined: String = "%s%s" % [password, json_response["salt"]]
