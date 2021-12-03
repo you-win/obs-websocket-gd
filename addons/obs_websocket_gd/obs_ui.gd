@@ -72,6 +72,8 @@ func _ready():
 	record.connect("pressed", self, "_on_record_pressed")
 	
 	
+	
+	
 
 func _exit_tree() -> void:
 	obs_websocket.free()
@@ -140,8 +142,31 @@ func _on_obs_updated(obs_data: Dictionary) -> void:
 			"StreamingStopped":
 				stream.text = START_STREAMING
 				is_streaming = false
-	print(obs_data)
 
+###############################################################################
+# Error Handling example:                                                     #
+# The client is expected to handle errors.                                    #
+# obs_websocket.gd emits "obs_updated" which can contain error information    #
+# so that obs_ui.gd can decide how to handle it.                              #
+###############################################################################
+
+	if obs_data.has("error"):
+		var error_popup = AcceptDialog.new()
+		match obs_data["error"]:
+			"Authentication Failed.":
+				obs_websocket.break_connection()
+				connect_button.text = CONNECT_TO_OBS
+				error_popup.dialog_text = "Unable to Authenticate to the OBS websocket server.\n\nIs your password correct?"
+				is_connection_established = false
+			"Connection Error.":
+				obs_websocket.break_connection()
+				connect_button.text = CONNECT_TO_OBS
+				error_popup.dialog_text = "Unable to connect to OBS.\n\nIs OBS running and OBS Websocket installed?"
+				is_connection_established = false
+		self.add_child(error_popup)
+		error_popup.popup_centered()
+		
+	print(obs_data)
 
 func _on_obs_connected() -> void:
 	obs_websocket.get_scene_list()

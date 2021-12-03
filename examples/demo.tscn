@@ -215,7 +215,6 @@ margin_left = 124.0
 margin_right = 244.0
 margin_bottom = 24.0
 size_flags_horizontal = 3
-text = "password"
 secret = true
 
 [node name="Connect" type="Button" parent="ObsUi/VBoxContainer/HBoxContainer/Websocket"]

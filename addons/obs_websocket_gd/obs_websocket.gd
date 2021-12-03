@@ -148,7 +148,11 @@ func _on_connection_closed(_was_clean_close: bool) -> void:
 	print("OBS connection closed")
 
 func _on_connection_error() -> void:
-	print("OBS connection error")
+	print("OBS connection error.")
+	# Have to create our own JSON here since this error doesn't return anyway.
+	# This is a copy of the Authentication error, just with Connection in its place.
+	var json_response : Dictionary = {"error":"Connection Error.", "message-id":"1", "status":"error"}
+	emit_signal("obs_updated", json_response)
 
 func _on_connection_established(_protocol: String) -> void:
 	print("OBS connection established")
@@ -163,6 +167,10 @@ func _on_data_received() -> void:
 	if typeof(json_response) != TYPE_DICTIONARY:
 		print("Invalid json_response: %s" % json_response)
 		return
+		
+	if json_response.has("error"):
+		print(json_response)
+		print("Error: %s" % json_response["error"])
 	
 	if json_response.has("authRequired"):
 		var secret_combined: String = "%s%s" % [password, json_response["salt"]]
@@ -174,7 +182,7 @@ func _on_data_received() -> void:
 	elif (json_response.has("message-id") and json_response["message-id"] == "1"):
 		if json_response["status"] == "ok":
 			emit_signal("obs_connected")
-		return
+			return
 	elif json_response.has("update-type") and json_response["update-type"] == "StreamStatus":
 		return
 
