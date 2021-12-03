@@ -144,10 +144,10 @@ func _on_obs_updated(obs_data: Dictionary) -> void:
 				is_streaming = false
 
 ###############################################################################
-# Error Handling example                                                      #
+# Error Handling example:                                                     #
 # The client is expected to handle errors.                                    #
-# As such obs_websocket.gd emits a signal called "obs_error" with             #
-# the error information so that obs_ui.gd can decide how to handle it.        #
+# obs_websocket.gd emits "obs_updated" which can contain error information    #
+# so that obs_ui.gd can decide how to handle it.                              #
 ###############################################################################
 
 	if obs_data.has("error"):
