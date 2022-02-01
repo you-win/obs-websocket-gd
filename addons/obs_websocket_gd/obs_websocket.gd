@@ -100,7 +100,9 @@ class ObsSceneItem extends ObsObject:
 			"y": y
 		})
 
-#region OpCodes
+#region OpCode model
+
+#region Base objects
 
 class ObsMessage:
 	const NO_NEED_TO_PARSE := "There is no need to parse Identify since all values are passed to new(...)"
@@ -139,6 +141,7 @@ class ServerObsMessage extends ObsMessage:
 	func parse(data: Dictionary) -> void:
 		.parse(data)
 
+#endregion
 
 #region Initialization
 
@@ -339,6 +342,346 @@ class RequestBatchResponse extends ServerObsMessage:
 		results = d["results"]
 
 #endregion
+
+#endregion
+
+#region OpCode enums
+
+const OpCodeEnums := {
+	"WebSocketOpCode": {
+		"Hello": {
+			"IDENTIFIER_VALUE": 0,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+
+		"Identify": {
+			"IDENTIFIER_VALUE": 1,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+
+		"Identified": {
+			"IDENTIFIER_VALUE": 2,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+
+		"Reidentify": {
+			"IDENTIFIER_VALUE": 3,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+
+		"Event": {
+			"IDENTIFIER_VALUE": 5,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+
+		"Request": {
+			"IDENTIFIER_VALUE": 6,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+
+		"RequestResponse": {
+			"IDENTIFIER_VALUE": 7,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+
+		"RequestBatch": {
+			"IDENTIFIER_VALUE": 8,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+
+		"RequestBatchResponse": {
+			"IDENTIFIER_VALUE": 9,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		}
+	},
+
+	"WebSocketCloseCode": {
+		"DontClose": {
+			"IDENTIFER_VALUE": 0,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"UnknownReason": {
+			"IDENTIFER_VALUE": 4000,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"MessageDecodeError": {
+			"IDENTIFER_VALUE": 4002,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"MissingDataField": {
+			"IDENTIFER_VALUE": 4003,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InvalidDataFieldType": {
+			"IDENTIFER_VALUE": 4004,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InvalidDataFieldValue": {
+			"IDENTIFER_VALUE": 4005,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"UnknownOpCode": {
+			"IDENTIFER_VALUE": 4006,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"NotIdentified": {
+			"IDENTIFER_VALUE": 4007,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"AlreadyIdentified": {
+			"IDENTIFER_VALUE": 4008,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"AuthenticationFailed": {
+			"IDENTIFER_VALUE": 4009,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"UnsupportedRpcVersion": {
+			"IDENTIFER_VALUE": 4010,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"SessionInvalidated": {
+			"IDENTIFER_VALUE": 4011,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"UnsupportedFeature": {
+			"IDENTIFER_VALUE": 4012,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+	},
+
+	"RequestBatchExecutionType": {
+		"None": {
+			"IDENTIFER_VALUE": -1,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"SerialRealtime": {
+			"IDENTIFER_VALUE": 0,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"SerialFrame": {
+			"IDENTIFER_VALUE": 1,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Parallel": {
+			"IDENTIFER_VALUE": 2,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+	},
+
+	"RequestStatus": {
+		"Unknown": {
+			"IDENTIFER_VALUE": 0,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"NoError": {
+			"IDENTIFER_VALUE": 10,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Success": {
+			"IDENTIFER_VALUE": 100,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"MissingRequestType": {
+			"IDENTIFER_VALUE": 203,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"UnknownRequestType": {
+			"IDENTIFER_VALUE": 204,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"GenericError": {
+			"IDENTIFER_VALUE": 205,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"UnsupportedRequestBatchExecutionType": {
+			"IDENTIFER_VALUE": 206,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"MissingRequestField": {
+			"IDENTIFER_VALUE": 300,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"MissingRequestData": {
+			"IDENTIFER_VALUE": 301,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InvalidRequestField": {
+			"IDENTIFER_VALUE": 400,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InvalidRequestFieldType": {
+			"IDENTIFER_VALUE": 401,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"RequestFieldOutOfRange": {
+			"IDENTIFER_VALUE": 402,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"RequestFieldEmpty": {
+			"IDENTIFER_VALUE": 403,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"TooManyRequestFields": {
+			"IDENTIFER_VALUE": 404,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"OutputRunning": {
+			"IDENTIFER_VALUE": 500,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"OutputNotRunning": {
+			"IDENTIFER_VALUE": 501,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"OutputPaused": {
+			"IDENTIFER_VALUE": 502,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"OutputNotPaused": {
+			"IDENTIFER_VALUE": 503,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"OutputDisabled": {
+			"IDENTIFER_VALUE": 504,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"StudioModeActive": {
+			"IDENTIFER_VALUE": 505,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"StudioModeNotActive": {
+			"IDENTIFER_VALUE": 506,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"ResourceNotFound": {
+			"IDENTIFER_VALUE": 600,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"ResourceAlreadyExists": {
+			"IDENTIFER_VALUE": 601,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InvalidResourceType": {
+			"IDENTIFER_VALUE": 602,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"NotEnoughResources": {
+			"IDENTIFER_VALUE": 603,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InvalidResourceState": {
+			"IDENTIFER_VALUE": 604,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InvalidInputKind": {
+			"IDENTIFER_VALUE": 605,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"ResourceNotConfigurable": {
+			"IDENTIFER_VALUE": 606,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"ResourceCreationFailed": {
+			"IDENTIFER_VALUE": 700,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"ResourceActionFailed": {
+			"IDENTIFER_VALUE": 701,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"RequestProcessingFailed": {
+			"IDENTIFER_VALUE": 702,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"CannotAct": {
+			"IDENTIFER_VALUE": 703,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+	},
+
+	"EventSubscription": {
+		"None": {
+			"IDENTIFER_VALUE": 0,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"General": {
+			"IDENTIFER_VALUE": 1 << 0,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Config": {
+			"IDENTIFER_VALUE": 1 << 1,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Scenes": {
+			"IDENTIFER_VALUE": 1 << 2,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Inputs": {
+			"IDENTIFER_VALUE": 1 << 3,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Transitions": {
+			"IDENTIFER_VALUE": 1 << 4,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Filters": {
+			"IDENTIFER_VALUE": 1 << 5,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Outputs": {
+			"IDENTIFER_VALUE": 1 << 6,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"SceneItems": {
+			"IDENTIFER_VALUE": 1 << 7,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"MediaInputs": {
+			"IDENTIFER_VALUE": 1 << 8,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Vendors": {
+			"IDENTIFER_VALUE": 1 << 9,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"Ui": {
+			"IDENTIFER_VALUE": 1 << 10,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"All": {
+			"IDENTIFER_VALUE": (
+				1 << 0 | # General
+				1 << 1 | # Config
+				1 << 2 | # Scenes
+				1 << 3 | # Inputs
+				1 << 4 | # Transitions
+				1 << 5 | # Filters
+				1 << 6 | # Outputs
+				1 << 7 | # SceneItems
+				1 << 8 | # MediaInputs
+				1 << 9 # Vendors
+			),
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InputVolumeMeters": {
+			"IDENTIFER_VALUE": 1 << 16,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InputActiveStateChanged": {
+			"IDENTIFER_VALUE": 1 << 17,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"InputShowStateChanged": {
+			"IDENTIFER_VALUE": 1 << 18,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+		"SceneItemTransformChanged": {
+			"IDENTIFER_VALUE": 1 << 19,
+			"LATEST_SUPPORTED_RPC_VERSION": 1
+		},
+	}
+}
 
 #endregion
 
