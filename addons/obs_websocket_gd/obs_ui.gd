@@ -1,4 +1,3 @@
-tool
 extends PanelContainer
 
 const CONNECT_TO_OBS: String = "Connect"
