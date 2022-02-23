@@ -1,6 +1,6 @@
 extends Reference
 
-signal on_log(message)
+signal message_logged(message)
 
 enum LogType { NONE, INFO, DEBUG, TRACE, ERROR }
 
@@ -11,6 +11,10 @@ var is_setup := false
 ###############################################################################
 # Builtin functions                                                           #
 ###############################################################################
+
+func _init(v = null) -> void:
+	if v != null:
+		setup(v)
 
 ###############################################################################
 # Connections                                                                 #
@@ -50,7 +54,7 @@ func _log(message: String, log_type: int) -> void:
 			assert(false, message)
 
 	print(message)
-	emit_signal("on_log", message)
+	emit_signal("message_logged", message)
 
 ###############################################################################
 # Public functions                                                            #

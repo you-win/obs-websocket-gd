@@ -1,7 +1,66 @@
 extends Node
 
-signal obs_connected()
+signal obs_authenticated()
 signal obs_updated(data)
+
+enum Error {
+	NONE = 0,
+	
+	MISSING_OP_CODE,
+	MISSING_DATA,
+
+	NO_NEED_TO_PARSE,
+
+	#region Hello
+
+	MISSING_HELLO_OBS_WEBSOCKET_VERSION,
+	MISSING_HELLO_RPC_VERSION,
+
+	#region Authentication
+
+	MISSING_AUTHENTICATION_CHALLENGE,
+	MISSING_AUTHENTICATION_SALT,
+
+	#endregion
+
+	#endregion
+
+	#region Identified
+
+	MISSING_IDENTIFIED_NEGOTIATED_RPC_VERSION,
+
+	#endregion
+
+	#region Event
+
+	MISSING_EVENT_TYPE,
+	MISSING_EVENT_INTENT,
+	MISSING_EVENT_DATA,
+
+	#endregion
+
+	#region Request
+
+	MISSING_REQUEST_TYPE,
+	MISSING_REQUEST_ID,
+	MISSING_REQUEST_STATUS,
+
+	#region RequestStatus
+
+	MISSING_REQUEST_STATUS_RESULT,
+	MISSING_REQUEST_STATUS_CODE,
+
+	#endregion
+
+	#endregion
+
+	#region RequestBatchResponse
+
+	MISSING_REQUEST_BATCH_RESPONSE_REQUEST_ID,
+	MISSING_REQUEST_BATCH_RESPONSE_RESULTS
+
+	#endregion
+}
 
 const RPC_VERSION: int = 1
 
@@ -10,14 +69,21 @@ const RPC_VERSION: int = 1
 #region Base objects
 
 class ObsMessage:
-	const NO_NEED_TO_PARSE := "There is no need to parse Identify since all values are passed to new(...)"
+	const NO_NEED_TO_PARSE := "There is no need to parse Client messages since all values are passed to new(...)"
 
 	var op: int
 	var d: Dictionary
 	
-	func parse(data: Dictionary) -> void:
+	func parse(data: Dictionary) -> int:
+		if not data.has("op"):
+			return Error.MISSING_OP_CODE
+		if not data.has("d"):
+			return Error.MISSING_DATA
+
 		op = data["op"]
 		d = data["d"]
+
+		return OK
 
 	func get_as_json(skip_empty: bool = false) -> String:
 		var json := {"d": {}}
@@ -53,12 +119,14 @@ class ObsMessage:
 		return JSON.print(json, "\t")
 
 class ClientObsMessage extends ObsMessage:
-	func parse(_data: Dictionary) -> void:
+	func parse(_data: Dictionary) -> int:
 		printerr(NO_NEED_TO_PARSE)
+		
+		return Error.NO_NEED_TO_PARSE
 
 class ServerObsMessage extends ObsMessage:
-	func parse(data: Dictionary) -> void:
-		.parse(data)
+	func parse(data: Dictionary) -> int:
+		return .parse(data)
 
 #endregion
 
@@ -69,24 +137,54 @@ class Hello extends ServerObsMessage:
 	FROM obs
 	TO client
 	"""
+	const OBS_WEBSOCKET_VERSION := "obsWebSocketVersion"
+	const RPC_VERSION := "rpcVersion"
+	const AUTHENTICATION := "authentication"
+
 	var obs_websocket_version: String
 	var rpc_version: int
 	var authentication: Authentication
 
-	func parse(data: Dictionary) -> void:
-		.parse(data)
+	func parse(data: Dictionary) -> int:
+		var err := .parse(data)
+		if err != OK:
+			return err
 
-		obs_websocket_version = d["obsWebSocketVersion"]
-		rpc_version = d["rpcVersion"]
-		authentication = Authentication.new(d["authentication"]) if d.has("authentication") else null
+		if not d.has(OBS_WEBSOCKET_VERSION):
+			return Error.MISSING_HELLO_OBS_WEBSOCKET_VERSION
+		if not d.has(RPC_VERSION):
+			return Error.MISSING_HELLO_RPC_VERSION
+
+		obs_websocket_version = d[OBS_WEBSOCKET_VERSION]
+		rpc_version = d[RPC_VERSION]
+		if d.has(AUTHENTICATION):
+			var a := Authentication.new()
+			err = a.parse(d[AUTHENTICATION])
+			if err != OK:
+				return err
+			authentication = a
+		else:
+			authentication = null
+
+		return OK
 
 class Authentication:
+	const CHALLENGE := "challenge"
+	const SALT := "salt"
+
 	var challenge: String
 	var salt: String
 
-	func _init(data: Dictionary) -> void:
-		challenge = data["challenge"]
-		salt = data["salt"]
+	func parse(data: Dictionary) -> int:
+		if not data.has(CHALLENGE):
+			return Error.MISSING_AUTHENTICATION_CHALLENGE
+		if not data.has(SALT):
+			return Error.MISSING_AUTHENTICATION_SALT
+
+		challenge = data[CHALLENGE]
+		salt = data[SALT]
+
+		return OK
 
 #endregion
 
@@ -103,7 +201,7 @@ class Identify extends ClientObsMessage:
 	var authentication: String
 	var event_subscriptions: int
 
-	func _init(p_rpc_version: int, p_authentication: String, p_event_subscriptions: int = -1) -> void:
+	func _init(p_rpc_version: int, p_authentication: String, p_event_subscriptions: int = OpCodeEnums.EventSubscription.All.IDENTIFIER_VALUE) -> void:
 		op = 1
 
 		rpc_version = p_rpc_version
@@ -115,12 +213,21 @@ class Identified extends ServerObsMessage:
 	FROM obs
 	TO client
 	"""
+	const NEGOTIATED_RPC_VERSION := "negotiatedRpcVersion"
+
 	var negotiated_rpc_version: int
 
-	func parse(data: Dictionary) -> void:
-		.parse(data)
+	func parse(data: Dictionary) -> int:
+		var err := .parse(data)
+		if err != OK:
+			return err
 
-		negotiated_rpc_version = d["negotiatedRpcVersion"]
+		if not d.has(NEGOTIATED_RPC_VERSION):
+			return Error.MISSING_IDENTIFIED_NEGOTIATED_RPC_VERSION
+
+		negotiated_rpc_version = d[NEGOTIATED_RPC_VERSION]
+
+		return OK
 
 class Reidentify extends ClientObsMessage:
 	"""
@@ -148,16 +255,29 @@ class Event extends ServerObsMessage:
 	event_data is optional and could be anything, so just store it wholesale. This means that all keys are still
 	camel-case not snake-case
 	"""
+	const EVENT_TYPE := "eventType"
+	const EVENT_INTENT := "event_intent"
+	const EVENT_DATA := "event_data"
+
 	var event_type: String
 	var event_intent: int
 	var event_data: Dictionary
 
-	func parse(data: Dictionary) -> void:
-		.parse(data)
+	func parse(data: Dictionary) -> int:
+		var err := .parse(data)
+		if err != OK:
+			return err
 
-		event_type = d["eventType"]
-		event_intent = d["eventIntent"]
-		event_data = d["eventData"] if d.has("eventData") else {}
+		if not d.has(EVENT_TYPE):
+			return Error.MISSING_EVENT_TYPE
+		if not d.has(EVENT_INTENT):
+			return Error.MISSING_EVENT_INTENT
+
+		event_type = d[EVENT_TYPE]
+		event_intent = d[EVENT_INTENT]
+		event_data = d[EVENT_DATA] if d.has(EVENT_DATA) else {}
+
+		return OK
 
 #endregion
 
@@ -188,29 +308,61 @@ class RequestResponse extends ObsMessage:
 
 	response_data is optional
 	"""
+	const REQUEST_TYPE := "requestType"
+	const REQUEST_ID := "requestId"
+	const REQUEST_STATUS := "requestStatus"
+	const RESPONSE_DATA := "responseData"
+
 	var request_type: String
 	var request_id: String
 	var request_status: RequestStatus
 	var response_data: Dictionary
 
-	func parse(data: Dictionary) -> void:
-		.parse(data)
+	func parse(data: Dictionary) -> int:
+		var err := .parse(data)
+		if err != OK:
+			return err
 
-		request_type = d["requestType"]
-		request_id = d["requestId"]
-		request_status = RequestStatus.new(d["requestStatus"])
+		if not d.has(REQUEST_TYPE):
+			return Error.MISSING_REQUEST_TYPE
+		if not d.has(REQUEST_ID):
+			return Error.MISSING_REQUEST_ID
+		if not d.has(REQUEST_STATUS):
+			return Error.MISSING_REQUEST_STATUS
+
+		request_type = d[REQUEST_TYPE]
+		request_id = d[REQUEST_ID]
+		var rs := RequestStatus.new()
+		err = rs.parse(d[REQUEST_STATUS])
+		if err != OK:
+			return err
+		request_status = rs
+		response_data = d[RESPONSE_DATA] if d.has(RESPONSE_DATA) else {}
+
+		return OK
 
 class RequestStatus:
+	const RESULT := "request"
+	const CODE := "code"
+	const COMMENT := "comment"
+
 	# true if the request was successful
 	var result: bool
 	var code: int
 	# Optional, provided by server on error
 	var comment: String
 
-	func _init(data: Dictionary) -> void:
-		result = data["result"]
-		code = data["code"]
-		comment = data["comment"] if data.has("comment") else ""
+	func parse(data: Dictionary) -> int:
+		if not data.has(RESULT):
+			return Error.MISSING_REQUEST_STATUS_RESULT
+		if not data.has(CODE):
+			return Error.MISSING_REQUEST_STATUS_CODE
+
+		result = data[RESULT]
+		code = data[CODE]
+		comment = data[COMMENT] if data.has(COMMENT) else ""
+		
+		return OK
 
 #endregion
 
@@ -251,14 +403,26 @@ class RequestBatchResponse extends ServerObsMessage:
 
 	results is an array of dictionaries
 	"""
+	const REQUEST_ID := "requestId"
+	const RESULTS := "results"
+
 	var request_id: String
 	var results: Array
 
-	func parse(data: Dictionary) -> void:
-		.parse(data)
+	func parse(data: Dictionary) -> int:
+		var err := .parse(data)
+		if err != OK:
+			return err
 
-		request_id = d["requestId"]
-		results = d["results"]
+		if not d.has(REQUEST_ID):
+			return Error.MISSING_REQUEST_BATCH_RESPONSE_REQUEST_ID
+		if not d.has(RESULTS):
+			return Error.MISSING_REQUEST_BATCH_RESPONSE_RESULTS
+
+		request_id = d[REQUEST_ID]
+		results = d[RESULTS]
+
+		return OK
 
 #endregion
 
@@ -316,260 +480,260 @@ const OpCodeEnums := {
 
 	"WebSocketCloseCode": {
 		"DontClose": {
-			"IDENTIFER_VALUE": 0,
+			"IDENTIFIER_VALUE": 0,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"UnknownReason": {
-			"IDENTIFER_VALUE": 4000,
+			"IDENTIFIER_VALUE": 4000,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"MessageDecodeError": {
-			"IDENTIFER_VALUE": 4002,
+			"IDENTIFIER_VALUE": 4002,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"MissingDataField": {
-			"IDENTIFER_VALUE": 4003,
+			"IDENTIFIER_VALUE": 4003,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InvalidDataFieldType": {
-			"IDENTIFER_VALUE": 4004,
+			"IDENTIFIER_VALUE": 4004,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InvalidDataFieldValue": {
-			"IDENTIFER_VALUE": 4005,
+			"IDENTIFIER_VALUE": 4005,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"UnknownOpCode": {
-			"IDENTIFER_VALUE": 4006,
+			"IDENTIFIER_VALUE": 4006,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"NotIdentified": {
-			"IDENTIFER_VALUE": 4007,
+			"IDENTIFIER_VALUE": 4007,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"AlreadyIdentified": {
-			"IDENTIFER_VALUE": 4008,
+			"IDENTIFIER_VALUE": 4008,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"AuthenticationFailed": {
-			"IDENTIFER_VALUE": 4009,
+			"IDENTIFIER_VALUE": 4009,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"UnsupportedRpcVersion": {
-			"IDENTIFER_VALUE": 4010,
+			"IDENTIFIER_VALUE": 4010,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"SessionInvalidated": {
-			"IDENTIFER_VALUE": 4011,
+			"IDENTIFIER_VALUE": 4011,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"UnsupportedFeature": {
-			"IDENTIFER_VALUE": 4012,
+			"IDENTIFIER_VALUE": 4012,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 	},
 
 	"RequestBatchExecutionType": {
 		"None": {
-			"IDENTIFER_VALUE": -1,
+			"IDENTIFIER_VALUE": -1,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"SerialRealtime": {
-			"IDENTIFER_VALUE": 0,
+			"IDENTIFIER_VALUE": 0,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"SerialFrame": {
-			"IDENTIFER_VALUE": 1,
+			"IDENTIFIER_VALUE": 1,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Parallel": {
-			"IDENTIFER_VALUE": 2,
+			"IDENTIFIER_VALUE": 2,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 	},
 
 	"RequestStatus": {
 		"Unknown": {
-			"IDENTIFER_VALUE": 0,
+			"IDENTIFIER_VALUE": 0,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"NoError": {
-			"IDENTIFER_VALUE": 10,
+			"IDENTIFIER_VALUE": 10,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Success": {
-			"IDENTIFER_VALUE": 100,
+			"IDENTIFIER_VALUE": 100,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"MissingRequestType": {
-			"IDENTIFER_VALUE": 203,
+			"IDENTIFIER_VALUE": 203,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"UnknownRequestType": {
-			"IDENTIFER_VALUE": 204,
+			"IDENTIFIER_VALUE": 204,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"GenericError": {
-			"IDENTIFER_VALUE": 205,
+			"IDENTIFIER_VALUE": 205,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"UnsupportedRequestBatchExecutionType": {
-			"IDENTIFER_VALUE": 206,
+			"IDENTIFIER_VALUE": 206,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"MissingRequestField": {
-			"IDENTIFER_VALUE": 300,
+			"IDENTIFIER_VALUE": 300,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"MissingRequestData": {
-			"IDENTIFER_VALUE": 301,
+			"IDENTIFIER_VALUE": 301,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InvalidRequestField": {
-			"IDENTIFER_VALUE": 400,
+			"IDENTIFIER_VALUE": 400,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InvalidRequestFieldType": {
-			"IDENTIFER_VALUE": 401,
+			"IDENTIFIER_VALUE": 401,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"RequestFieldOutOfRange": {
-			"IDENTIFER_VALUE": 402,
+			"IDENTIFIER_VALUE": 402,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"RequestFieldEmpty": {
-			"IDENTIFER_VALUE": 403,
+			"IDENTIFIER_VALUE": 403,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"TooManyRequestFields": {
-			"IDENTIFER_VALUE": 404,
+			"IDENTIFIER_VALUE": 404,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"OutputRunning": {
-			"IDENTIFER_VALUE": 500,
+			"IDENTIFIER_VALUE": 500,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"OutputNotRunning": {
-			"IDENTIFER_VALUE": 501,
+			"IDENTIFIER_VALUE": 501,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"OutputPaused": {
-			"IDENTIFER_VALUE": 502,
+			"IDENTIFIER_VALUE": 502,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"OutputNotPaused": {
-			"IDENTIFER_VALUE": 503,
+			"IDENTIFIER_VALUE": 503,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"OutputDisabled": {
-			"IDENTIFER_VALUE": 504,
+			"IDENTIFIER_VALUE": 504,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"StudioModeActive": {
-			"IDENTIFER_VALUE": 505,
+			"IDENTIFIER_VALUE": 505,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"StudioModeNotActive": {
-			"IDENTIFER_VALUE": 506,
+			"IDENTIFIER_VALUE": 506,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"ResourceNotFound": {
-			"IDENTIFER_VALUE": 600,
+			"IDENTIFIER_VALUE": 600,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"ResourceAlreadyExists": {
-			"IDENTIFER_VALUE": 601,
+			"IDENTIFIER_VALUE": 601,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InvalidResourceType": {
-			"IDENTIFER_VALUE": 602,
+			"IDENTIFIER_VALUE": 602,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"NotEnoughResources": {
-			"IDENTIFER_VALUE": 603,
+			"IDENTIFIER_VALUE": 603,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InvalidResourceState": {
-			"IDENTIFER_VALUE": 604,
+			"IDENTIFIER_VALUE": 604,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InvalidInputKind": {
-			"IDENTIFER_VALUE": 605,
+			"IDENTIFIER_VALUE": 605,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"ResourceNotConfigurable": {
-			"IDENTIFER_VALUE": 606,
+			"IDENTIFIER_VALUE": 606,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"ResourceCreationFailed": {
-			"IDENTIFER_VALUE": 700,
+			"IDENTIFIER_VALUE": 700,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"ResourceActionFailed": {
-			"IDENTIFER_VALUE": 701,
+			"IDENTIFIER_VALUE": 701,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"RequestProcessingFailed": {
-			"IDENTIFER_VALUE": 702,
+			"IDENTIFIER_VALUE": 702,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"CannotAct": {
-			"IDENTIFER_VALUE": 703,
+			"IDENTIFIER_VALUE": 703,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 	},
 
 	"EventSubscription": {
 		"None": {
-			"IDENTIFER_VALUE": 0,
+			"IDENTIFIER_VALUE": 0,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"General": {
-			"IDENTIFER_VALUE": 1 << 0,
+			"IDENTIFIER_VALUE": 1 << 0,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Config": {
-			"IDENTIFER_VALUE": 1 << 1,
+			"IDENTIFIER_VALUE": 1 << 1,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Scenes": {
-			"IDENTIFER_VALUE": 1 << 2,
+			"IDENTIFIER_VALUE": 1 << 2,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Inputs": {
-			"IDENTIFER_VALUE": 1 << 3,
+			"IDENTIFIER_VALUE": 1 << 3,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Transitions": {
-			"IDENTIFER_VALUE": 1 << 4,
+			"IDENTIFIER_VALUE": 1 << 4,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Filters": {
-			"IDENTIFER_VALUE": 1 << 5,
+			"IDENTIFIER_VALUE": 1 << 5,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Outputs": {
-			"IDENTIFER_VALUE": 1 << 6,
+			"IDENTIFIER_VALUE": 1 << 6,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"SceneItems": {
-			"IDENTIFER_VALUE": 1 << 7,
+			"IDENTIFIER_VALUE": 1 << 7,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"MediaInputs": {
-			"IDENTIFER_VALUE": 1 << 8,
+			"IDENTIFIER_VALUE": 1 << 8,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Vendors": {
-			"IDENTIFER_VALUE": 1 << 9,
+			"IDENTIFIER_VALUE": 1 << 9,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"Ui": {
-			"IDENTIFER_VALUE": 1 << 10,
+			"IDENTIFIER_VALUE": 1 << 10,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"All": {
-			"IDENTIFER_VALUE": (
+			"IDENTIFIER_VALUE": (
 				1 << 0 | # General
 				1 << 1 | # Config
 				1 << 2 | # Scenes
@@ -584,19 +748,19 @@ const OpCodeEnums := {
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InputVolumeMeters": {
-			"IDENTIFER_VALUE": 1 << 16,
+			"IDENTIFIER_VALUE": 1 << 16,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InputActiveStateChanged": {
-			"IDENTIFER_VALUE": 1 << 17,
+			"IDENTIFIER_VALUE": 1 << 17,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"InputShowStateChanged": {
-			"IDENTIFER_VALUE": 1 << 18,
+			"IDENTIFIER_VALUE": 1 << 18,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 		"SceneItemTransformChanged": {
-			"IDENTIFER_VALUE": 1 << 19,
+			"IDENTIFIER_VALUE": 1 << 19,
 			"LATEST_SUPPORTED_RPC_VERSION": 1
 		},
 	}
@@ -609,7 +773,7 @@ const URL_PATH: String = "ws://%s:%s"
 const POLL_TIME: float = 1.0
 var poll_counter: float = 0.0
 
-var logger = preload("res://addons/obs_websocket_gd/logger.gd").new()
+var logger = preload("res://addons/obs-websocket-gd/logger.gd").new()
 
 var obs_client := WebSocketClient.new()
 
@@ -659,6 +823,8 @@ func _on_connection_established(protocol: String) -> void:
 	obs_client.get_peer(1).set_write_mode(WebSocketPeer.WRITE_MODE_TEXT)
 
 func _on_hello_received() -> void:
+	logger.debug("hello received")
+	
 	var message: Dictionary = _get_message()
 	if message.empty():
 		logger.error("Invalid hello message, aborting")
@@ -677,6 +843,8 @@ func _on_hello_received() -> void:
 	_identify(hello)
 
 func _on_identified_received() -> void:
+	logger.debug("identified received")
+	
 	var message: Dictionary = _get_message()
 	if message.empty():
 		logger.error("Invalid identified message, aborting")
@@ -684,6 +852,8 @@ func _on_identified_received() -> void:
 	
 	obs_client.disconnect("data_received", self, "_on_identified_received")
 	obs_client.connect("data_received", self, "_on_data_received")
+	
+	emit_signal("obs_authenticated")
 	
 	logger.info("Connected to obs-websocket")
 
@@ -747,5 +917,9 @@ func break_connection() -> void:
 
 func send_command(command: String, data: Dictionary = {}) -> void:
 	if waiting_for_response:
-		print("Still waiting for response for last command")
+		logger.info("Still waiting for response for last command")
 		return
+	
+	var req := Request.new(command, "1", data)
+	
+	_send_message(req.get_as_json().to_utf8())

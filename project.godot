@@ -16,7 +16,7 @@ config/icon="res://obs_godot_icon.png"
 
 [editor_plugins]
 
-enabled=PoolStringArray( "res://addons/obs_websocket_gd/plugin.cfg" )
+enabled=PoolStringArray( "res://addons/gut/plugin.cfg", "res://addons/obs_websocket_gd/plugin.cfg" )
 
 [physics]
 
