@@ -1,7 +1,7 @@
 extends Node
 
 signal obs_authenticated()
-signal obs_updated(data)
+signal obs_data_received(data)
 
 enum Error {
 	NONE = 0,
@@ -71,17 +71,23 @@ const RPC_VERSION: int = 1
 class ObsMessage:
 	const NO_NEED_TO_PARSE := "There is no need to parse Client messages since all values are passed to new(...)"
 
+	const OP := "op"
+	const D := "d"
+
 	var op: int
 	var d: Dictionary
 	
+	func _to_string() -> String:
+		return get_as_json()
+	
 	func parse(data: Dictionary) -> int:
-		if not data.has("op"):
-			return Error.MISSING_OP_CODE
-		if not data.has("d"):
-			return Error.MISSING_DATA
+		op = data.get(OP, -1)
+		d = data.get(D, {})
 
-		op = data["op"]
-		d = data["d"]
+		if not data.has(OP):
+			return Error.MISSING_OP_CODE
+		if not data.has(D):
+			return Error.MISSING_DATA
 
 		return OK
 
@@ -151,22 +157,21 @@ class Hello extends ServerObsMessage:
 			return err
 
 		if not d.has(OBS_WEBSOCKET_VERSION):
-			return Error.MISSING_HELLO_OBS_WEBSOCKET_VERSION
+			err = Error.MISSING_HELLO_OBS_WEBSOCKET_VERSION
 		if not d.has(RPC_VERSION):
-			return Error.MISSING_HELLO_RPC_VERSION
+			err = Error.MISSING_HELLO_RPC_VERSION
 
-		obs_websocket_version = d[OBS_WEBSOCKET_VERSION]
-		rpc_version = d[RPC_VERSION]
+		obs_websocket_version = d.get(OBS_WEBSOCKET_VERSION, "")
+		rpc_version = d.get(RPC_VERSION, -1)
 		if d.has(AUTHENTICATION):
 			var a := Authentication.new()
-			err = a.parse(d[AUTHENTICATION])
-			if err != OK:
-				return err
+			var auth_err: int = a.parse(d.get(AUTHENTICATION, {}))
+			err = auth_err if auth_err != OK else err
 			authentication = a
 		else:
 			authentication = null
 
-		return OK
+		return err
 
 class Authentication:
 	const CHALLENGE := "challenge"
@@ -175,16 +180,24 @@ class Authentication:
 	var challenge: String
 	var salt: String
 
+	func _to_string() -> String:
+		return JSON.print({
+			"challenge": challenge,
+			"salt": salt
+		}, "\t")
+
 	func parse(data: Dictionary) -> int:
+		var err: int = OK
+
 		if not data.has(CHALLENGE):
-			return Error.MISSING_AUTHENTICATION_CHALLENGE
+			err = Error.MISSING_AUTHENTICATION_CHALLENGE
 		if not data.has(SALT):
-			return Error.MISSING_AUTHENTICATION_SALT
+			err = Error.MISSING_AUTHENTICATION_SALT
 
-		challenge = data[CHALLENGE]
-		salt = data[SALT]
+		challenge = data.get(CHALLENGE, "")
+		salt = data.get(SALT, "")
 
-		return OK
+		return err
 
 #endregion
 
@@ -223,11 +236,11 @@ class Identified extends ServerObsMessage:
 			return err
 
 		if not d.has(NEGOTIATED_RPC_VERSION):
-			return Error.MISSING_IDENTIFIED_NEGOTIATED_RPC_VERSION
+			err = Error.MISSING_IDENTIFIED_NEGOTIATED_RPC_VERSION
 
-		negotiated_rpc_version = d[NEGOTIATED_RPC_VERSION]
+		negotiated_rpc_version = d.get(NEGOTIATED_RPC_VERSION, -1)
 
-		return OK
+		return err
 
 class Reidentify extends ClientObsMessage:
 	"""
@@ -269,15 +282,15 @@ class Event extends ServerObsMessage:
 			return err
 
 		if not d.has(EVENT_TYPE):
-			return Error.MISSING_EVENT_TYPE
+			err = Error.MISSING_EVENT_TYPE
 		if not d.has(EVENT_INTENT):
-			return Error.MISSING_EVENT_INTENT
+			err = Error.MISSING_EVENT_INTENT
 
-		event_type = d[EVENT_TYPE]
-		event_intent = d[EVENT_INTENT]
-		event_data = d[EVENT_DATA] if d.has(EVENT_DATA) else {}
+		event_type = d.get(EVENT_TYPE, "")
+		event_intent = d.get(EVENT_INTENT, -1)
+		event_data = d.get(EVENT_DATA, {})
 
-		return OK
+		return err
 
 #endregion
 
@@ -301,7 +314,7 @@ class Request extends ClientObsMessage:
 		request_id = p_request_id
 		request_data = p_request_data
 
-class RequestResponse extends ObsMessage:
+class RequestResponse extends ServerObsMessage:
 	"""
 	FROM obs
 	TO client
@@ -324,22 +337,21 @@ class RequestResponse extends ObsMessage:
 			return err
 
 		if not d.has(REQUEST_TYPE):
-			return Error.MISSING_REQUEST_TYPE
+			err = Error.MISSING_REQUEST_TYPE
 		if not d.has(REQUEST_ID):
-			return Error.MISSING_REQUEST_ID
-		if not d.has(REQUEST_STATUS):
-			return Error.MISSING_REQUEST_STATUS
+			err = Error.MISSING_REQUEST_ID
+		# if not d.has(REQUEST_STATUS): # TODO this appears to be optional for some requests
+		# 	err = Error.MISSING_REQUEST_STATUS
 
-		request_type = d[REQUEST_TYPE]
-		request_id = d[REQUEST_ID]
+		request_type = d.get(REQUEST_TYPE, "")
+		request_id = d.get(REQUEST_ID, "")
 		var rs := RequestStatus.new()
-		err = rs.parse(d[REQUEST_STATUS])
-		if err != OK:
-			return err
+		var rs_err: int = rs.parse(d.get(REQUEST_STATUS, {}))
+		# err = rs_err if rs_err != OK else err # TODO this appears to be optional for some requests
 		request_status = rs
-		response_data = d[RESPONSE_DATA] if d.has(RESPONSE_DATA) else {}
+		response_data = d.get(RESPONSE_DATA, {})
 
-		return OK
+		return err
 
 class RequestStatus:
 	const RESULT := "request"
@@ -352,17 +364,26 @@ class RequestStatus:
 	# Optional, provided by server on error
 	var comment: String
 
-	func parse(data: Dictionary) -> int:
-		if not data.has(RESULT):
-			return Error.MISSING_REQUEST_STATUS_RESULT
-		if not data.has(CODE):
-			return Error.MISSING_REQUEST_STATUS_CODE
+	func _to_string() -> String:
+		return JSON.print({
+			"result": result,
+			"code": code,
+			"comment": comment
+		}, "\t")
 
-		result = data[RESULT]
-		code = data[CODE]
-		comment = data[COMMENT] if data.has(COMMENT) else ""
+	func parse(data: Dictionary) -> int:
+		var err: int = OK
+
+		if not data.has(RESULT):
+			err = Error.MISSING_REQUEST_STATUS_RESULT
+		if not data.has(CODE):
+			err = Error.MISSING_REQUEST_STATUS_CODE
 		
-		return OK
+		result = data.get(RESULT, false)
+		code = data.get(CODE, -1)
+		comment = data.get(COMMENT, "")
+		
+		return err
 
 #endregion
 
@@ -415,14 +436,14 @@ class RequestBatchResponse extends ServerObsMessage:
 			return err
 
 		if not d.has(REQUEST_ID):
-			return Error.MISSING_REQUEST_BATCH_RESPONSE_REQUEST_ID
+			err = Error.MISSING_REQUEST_BATCH_RESPONSE_REQUEST_ID
 		if not d.has(RESULTS):
-			return Error.MISSING_REQUEST_BATCH_RESPONSE_RESULTS
+			err = Error.MISSING_REQUEST_BATCH_RESPONSE_RESULTS
 
-		request_id = d[REQUEST_ID]
-		results = d[RESULTS]
+		request_id = d.get(REQUEST_ID, "")
+		results = d.get(RESULTS, [])
 
-		return OK
+		return err
 
 #endregion
 
@@ -859,10 +880,49 @@ func _on_identified_received() -> void:
 
 func _on_data_received() -> void:
 	var message: Dictionary = _get_message()
+	
+	if message.empty() or not message.has("op"):
+		logger.error("Invalid data received, bailing out")
+		return
 
-	logger.info(str(message))
+	var data: ServerObsMessage
+	var err: int = Error.NONE
+	
+	match int(message.op):
+		0:
+			logger.info("Hello opcode received again, this is weird\n%s" % str(message))
+			data = Hello.new()
+			err = data.parse(message)
+			if err != OK:
+				logger.error(get_error_name(err))
+		1, 3, 6, 8:
+			logger.error("Invalid opcode received\n%s" % str(message))
+			return
+		2:
+			logger.info("Identified opcode received again, this is weird\n%s" % str(message))
+			data = Identified.new()
+			err = data.parse(message)
+			if err != OK:
+				logger.error(get_error_name(err))
+		5:
+			data = Event.new()
+			err = data.parse(message)
+			if err != OK:
+				logger.error(get_error_name(err))
+		7:
+			data = RequestResponse.new()
+			err = data.parse(message)
+			if err != OK:
+				logger.error(get_error_name(err))
+		9:
+			data = RequestBatchResponse.new()
+			err = data.parse(message)
+			if err != OK:
+				logger.error(get_error_name(err))
+		_:
+			logger.error("Unhandled opcode received\n%s" % str(message))
 
-	# emit_signal("obs_updated")
+	emit_signal("obs_data_received", data)
 
 func _on_server_close_request(code: int, reason: String) -> void:
 	logger.info("OBS close request %d received with reason: %s" % [code, reason])
@@ -923,3 +983,6 @@ func send_command(command: String, data: Dictionary = {}) -> void:
 	var req := Request.new(command, "1", data)
 	
 	_send_message(req.get_as_json().to_utf8())
+
+func get_error_name(error: int) -> String:
+	return Error.keys()[error]

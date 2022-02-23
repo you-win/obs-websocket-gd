@@ -14,6 +14,8 @@ func _ready() -> void:
 	obs_websocket = ObsWebsocket.new()
 	add_child(obs_websocket)
 	
+	obs_websocket.connect("obs_data_received", self, "_on_obs_data_received")
+	
 #	obs_ui = ObsUi.instance()
 #	add_child(obs_ui)
 	
@@ -27,6 +29,9 @@ func _ready() -> void:
 ###############################################################################
 # Connections                                                                 #
 ###############################################################################
+
+func _on_obs_data_received(data):
+	print(data.get_as_json())
 
 ###############################################################################
 # Private functions                                                           #

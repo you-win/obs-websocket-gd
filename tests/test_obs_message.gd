@@ -22,8 +22,10 @@ func after_all():
 # Tests                                                                       #
 ###############################################################################
 
+const DUMMY_OP_CODE: int = 1000
+
 var good_data0 := {
-	"op": -1, # Dummy OpCode
+	"op": DUMMY_OP_CODE, # Dummy OpCode
 	"d": {
 		"test": "value",
 		"dict": {
@@ -40,14 +42,14 @@ var good_data0 := {
 
 var good_data1 := {
 	"bad_key": "wee", # Value should be ignored
-	"op": -1,
+	"op": DUMMY_OP_CODE,
 	"d": {
 		"some_data": "data_value"
 	}
 }
 
 var good_data2 := {
-	"op": -1,
+	"op": DUMMY_OP_CODE,
 	"d": {}
 }
 
@@ -61,7 +63,7 @@ var bad_data1 := {
 }
 
 var bad_data2 := {
-	"op": -1
+	"op": DUMMY_OP_CODE
 }
 
 func test_obs_message_parse_pass():
@@ -69,7 +71,7 @@ func test_obs_message_parse_pass():
 	
 	assert_eq(m0.parse(good_data0), OK)
 
-	assert_eq(m0.op, -1)
+	assert_eq(m0.op, DUMMY_OP_CODE)
 	assert_eq(m0.d.test, "value")
 	assert_eq(m0.d.dict.some_key, "some_value")
 	assert_eq(m0.d.dict.some_array[0], "test")
@@ -80,7 +82,7 @@ func test_obs_message_parse_pass():
 	assert_eq(m1.parse(good_data1), OK)
 
 	assert_null(m1.get("bad_key"))
-	assert_eq(m1.op, -1)
+	assert_eq(m1.op, DUMMY_OP_CODE)
 	assert_eq(m1.d.some_data, "data_value")
 
 	var m2 := ObsMessage.new()

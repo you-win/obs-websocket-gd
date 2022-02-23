@@ -58,4 +58,3 @@ func test_identify_pass():
 
 	assert_eq(m1.authentication, good_data1.d.authentication)
 	assert_eq(m1.event_subscriptions, OpCodeEnums.EventSubscription.None.IDENTIFIER_VALUE)
-
