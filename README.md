@@ -13,6 +13,6 @@ This addon targets obs-websocket 5.x. Please use the `obs-websocket_4.x` branch 
 3. Clone this project
 4. Instance in the `addons/obs_websocket_gd/obs_websocket.tscn` file somewhere in your project
 5. By default, the addon tries to connect to `localhost:4444` with a password of `password`. Change the password in `addons/obs_websocket_gd/obs_websocket.gd` to the password set in step 2. The variables are exported for convenience
-6. (OPTIONAL) Connect some listener to the `obs_updated(update_data)` signal in `obs_websocket.gd`. `obs_updated` outputs a Dictioanry
+6. (OPTIONAL) Connect some listener to the `obs_data_received(update_data)` signal in `obs_websocket.gd`. `obs_data_received` outputs an `ObsMessage` data structure. This data structure stores the raw response and also maps the data to the expected OpCode fields.
 7. Call the `send_command(command: String, data: Dictionary = {})` method on the `obs_websocket.gd` instance. Reference the [obs-websocket protocol](https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md) to find out what commands + data to send
 
