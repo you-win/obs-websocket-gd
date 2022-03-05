@@ -36,6 +36,7 @@ enum Error {
 	MISSING_EVENT_TYPE,
 	MISSING_EVENT_INTENT,
 	MISSING_EVENT_DATA,
+	UNEXPECTED_EVENT_DATA_TYPE,
 
 	#endregion
 
@@ -269,8 +270,8 @@ class Event extends ServerObsMessage:
 	camel-case not snake-case
 	"""
 	const EVENT_TYPE := "eventType"
-	const EVENT_INTENT := "event_intent"
-	const EVENT_DATA := "event_data"
+	const EVENT_INTENT := "eventIntent"
+	const EVENT_DATA := "eventData"
 
 	var event_type: String
 	var event_intent: int
@@ -289,6 +290,9 @@ class Event extends ServerObsMessage:
 		event_type = d.get(EVENT_TYPE, "")
 		event_intent = d.get(EVENT_INTENT, -1)
 		event_data = d.get(EVENT_DATA, {})
+
+		if typeof(event_data) != TYPE_DICTIONARY:
+			err = Error.UNEXPECTED_EVENT_DATA_TYPE
 
 		return err
 
@@ -794,7 +798,90 @@ const URL_PATH: String = "ws://%s:%s"
 const POLL_TIME: float = 1.0
 var poll_counter: float = 0.0
 
-var logger = preload("res://addons/obs-websocket-gd/logger.gd").new()
+class Logger:
+	"""
+	Util class pulled out of my usual Logger implementation so that
+	obs_websocket.gd can be used completely standalone
+	"""
+
+	signal message_logged(message)
+
+	enum LogType { NONE, INFO, DEBUG, TRACE, ERROR }
+
+	var parent_name: String = "DEFAULT_LOGGER"
+
+	var is_setup := false
+
+	func _init(v = null) -> void:
+		if v != null:
+			setup(v)
+
+	func _log(message: String, log_type: int) -> void:
+		var datetime: Dictionary = OS.get_datetime()
+		message = "%s %s-%s-%s_%s:%s:%s %s" % [
+			parent_name,
+			datetime["year"],
+			datetime["month"],
+			datetime["day"],
+			datetime["hour"],
+			datetime["minute"],
+			datetime["second"],
+			message
+		]
+		
+		match log_type:
+			LogType.INFO:
+				message = "[INFO] %s" % message
+			LogType.DEBUG:
+				message = "[DEBUG] %s" % message
+			LogType.TRACE:
+				message = "[TRACE] %s" % message
+				var stack_trace: Array = get_stack()
+				for i in stack_trace.size() - 2:
+					var data: Dictionary = stack_trace[i + 2]
+					message = "%s\n\t%d - %s:%d - %s" % [
+						message, i, data["source"], data["line"], data["function"]]
+			LogType.ERROR:
+				message = "[ERROR] %s" % message
+				assert(false, message)
+	
+		print(message)
+		emit_signal("message_logged", message)
+
+	func setup(n) -> void:
+		"""
+		Initialize the logger with the containing object name. Prefer user-defined values but
+		also try to intelligently get the calling object name as well
+		"""
+		if is_setup:
+			return
+		
+		if typeof(n) == TYPE_STRING:
+			parent_name = n
+		elif n.get_script():
+			parent_name = n.get_script().resource_path.get_file()
+		elif n.get("name"):
+			parent_name = n.name
+		else:
+			trace("Unable to setup logger using var: %s" % str(n))
+		
+		is_setup = true
+	
+	func info(message: String) -> void:
+		_log(message, LogType.INFO)
+	
+	func debug(message: String) -> void:
+		if OS.is_debug_build():
+			_log(message, LogType.DEBUG)
+	
+	func trace(message: String) -> void:
+		if OS.is_debug_build():
+			_log(message, LogType.TRACE)
+	
+	func error(message: String) -> void:
+		_log(message, LogType.ERROR)
+
+var logger = Logger.new()
 
 var obs_client := WebSocketClient.new()
 
