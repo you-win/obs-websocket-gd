@@ -1,0 +1,24 @@
+{
+  "name": "@sometimes_youwin/obs-websocket-gd",
+  "version": "1.0.1",
+  "description": "Control OBS from inside a Godot game or app.",
+  "main": "obs_websocket.gd",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/you-win/obs-websocket-gd.git"
+  },
+  "keywords": [
+    "godot",
+    "godot-engine",
+    "obs"
+  ],
+  "author": "Tim Yuen",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/you-win/obs-websocket-gd/issues"
+  },
+  "homepage": "https://github.com/you-win/obs-websocket-gd#readme"
+}
