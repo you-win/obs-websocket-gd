@@ -14,15 +14,15 @@ func _ready() -> void:
 	obs_websocket = ObsWebsocket.new()
 	add_child(obs_websocket)
 	
-	obs_websocket.connect("obs_data_received", self, "_on_obs_data_received")
+	obs_websocket.connect("obs_data_received",Callable(self,"_on_obs_data_received"))
 	
-#	obs_ui = ObsUi.instance()
+#	obs_ui = ObsUi.instantiate()
 #	add_child(obs_ui)
 	
 #	obs_ui.obs_websocket = obs_websocket
 	obs_websocket.establish_connection()
 	
-	yield(obs_websocket, "obs_authenticated")
+	await obs_websocket.obs_authenticated
 	
 	obs_websocket.send_command("GetVersion")
 

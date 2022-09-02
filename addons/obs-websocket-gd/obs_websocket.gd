@@ -96,7 +96,7 @@ class ObsMessage:
 		var json := {"d": {}}
 		for i in get_property_list():
 			var prop_name: String = i["name"]
-			if prop_name in ["Object", "Reference", "script", "Script Variables", "d"]:
+			if prop_name in ["Object", "RefCounted", "script", "Script Variables", "d"]:
 				continue
 			
 			var prop = get(prop_name)
@@ -105,7 +105,7 @@ class ObsMessage:
 			if skip_empty:
 				match typeof(prop):
 					TYPE_ARRAY, TYPE_DICTIONARY:
-						if prop.empty():
+						if prop.is_empty():
 							should_skip = true
 					TYPE_INT:
 						if prop < 0:
@@ -113,7 +113,7 @@ class ObsMessage:
 			if should_skip:
 				continue
 			
-			var split_name: PoolStringArray = prop_name.split("_")
+			var split_name: PackedStringArray = prop_name.split("_")
 			prop_name = split_name[0]
 			for s in range(1, split_name.size()):
 				prop_name = "%s%s" % [prop_name, split_name[s].capitalize()]
@@ -123,7 +123,8 @@ class ObsMessage:
 			else:
 				json["d"][prop_name] = prop
 		
-		return JSON.print(json, "\t")
+		var json_obj := JSON.new()
+		return json_obj.stringify(json, "\t")
 
 class ClientObsMessage extends ObsMessage:
 	func parse(_data: Dictionary) -> int:
@@ -133,17 +134,14 @@ class ClientObsMessage extends ObsMessage:
 
 class ServerObsMessage extends ObsMessage:
 	func parse(data: Dictionary) -> int:
-		return .parse(data)
+		return super.parse(data)
 
 #endregion
 
 #region Initialization
 
+## FROM obs TO client
 class Hello extends ServerObsMessage:
-	"""
-	FROM obs
-	TO client
-	"""
 	const OBS_WEBSOCKET_VERSION := "obsWebSocketVersion"
 	const RPC_VERSION := "rpcVersion"
 	const AUTHENTICATION := "authentication"
@@ -153,7 +151,7 @@ class Hello extends ServerObsMessage:
 	var authentication: Authentication
 
 	func parse(data: Dictionary) -> int:
-		var err := .parse(data)
+		var err := super.parse(data)
 		if err != OK:
 			return err
 
@@ -182,7 +180,8 @@ class Authentication:
 	var salt: String
 
 	func _to_string() -> String:
-		return JSON.print({
+		var json := JSON.new()
+		return json.stringify({
 			"challenge": challenge,
 			"salt": salt
 		}, "\t")
@@ -204,35 +203,29 @@ class Authentication:
 
 #region Identification
 
+## FROM client TO obs
+##
+## event_subscriptions is a bitmask
 class Identify extends ClientObsMessage:
-	"""
-	FROM client
-	TO obs
-
-	event_subscriptions is a bitmask
-	"""
 	var rpc_version: int
 	var authentication: String
 	var event_subscriptions: int
 
-	func _init(p_rpc_version: int, p_authentication: String, p_event_subscriptions: int = OpCodeEnums.EventSubscription.All.IDENTIFIER_VALUE) -> void:
+	func _init(p_rpc_version: int,p_authentication: String,p_event_subscriptions: int = OpCodeEnums.EventSubscription.All.IDENTIFIER_VALUE):
 		op = 1
 
 		rpc_version = p_rpc_version
 		authentication = p_authentication
 		event_subscriptions = p_event_subscriptions
 
+## FROM obs TO client
 class Identified extends ServerObsMessage:
-	"""
-	FROM obs
-	TO client
-	"""
 	const NEGOTIATED_RPC_VERSION := "negotiatedRpcVersion"
 
 	var negotiated_rpc_version: int
 
 	func parse(data: Dictionary) -> int:
-		var err := .parse(data)
+		var err := super.parse(data)
 		if err != OK:
 			return err
 
@@ -243,16 +236,13 @@ class Identified extends ServerObsMessage:
 
 		return err
 
+## FROM client TO obs
+##
+## event_subscriptions is a bitmask
 class Reidentify extends ClientObsMessage:
-	"""
-	FROM client
-	TO obs
-
-	event subscriptions is a bitmask
-	"""
 	var event_subscriptions: int
 
-	func _init(p_event_subscriptions: int = 33) -> void:
+	func _init(p_event_subscriptions: int = 33):
 		op = 3
 		
 		event_subscriptions = p_event_subscriptions
@@ -261,14 +251,11 @@ class Reidentify extends ClientObsMessage:
 
 #region Event
 
+## FROM obs TO client
+##
+## event_data is optional and could be anything, so just store it wholesale. This means that
+## all keys are still camelCase, not snake_case
 class Event extends ServerObsMessage:
-	"""
-	FROM obs
-	TO client
-
-	event_data is optional and could be anything, so just store it wholesale. This means that all keys are still
-	camel-case not snake-case
-	"""
 	const EVENT_TYPE := "eventType"
 	const EVENT_INTENT := "eventIntent"
 	const EVENT_DATA := "eventData"
@@ -278,7 +265,7 @@ class Event extends ServerObsMessage:
 	var event_data: Dictionary
 
 	func parse(data: Dictionary) -> int:
-		var err := .parse(data)
+		var err := super.parse(data)
 		if err != OK:
 			return err
 
@@ -300,31 +287,25 @@ class Event extends ServerObsMessage:
 
 #region Request
 
+## FROM client TO obs
+##
+## request_data is optional and could be anything. All values need to be camelCased
 class Request extends ClientObsMessage:
-	"""
-	FROM client
-	TO obs
-
-	request_data is optional and could be anything. All values need to be camel-cased
-	"""
 	var request_type: String
 	var request_id: String
 	var request_data: Dictionary
 
-	func _init(p_request_type: String, p_request_id: String, p_request_data: Dictionary = {}) -> void:
+	func _init(p_request_type: String,p_request_id: String,p_request_data: Dictionary = {}):
 		op = 6
 
 		request_type = p_request_type
 		request_id = p_request_id
 		request_data = p_request_data
 
+## FROM obs TO client
+##
+## response_data is optional
 class RequestResponse extends ServerObsMessage:
-	"""
-	FROM obs
-	TO client
-
-	response_data is optional
-	"""
 	const REQUEST_TYPE := "requestType"
 	const REQUEST_ID := "requestId"
 	const REQUEST_STATUS := "requestStatus"
@@ -336,7 +317,7 @@ class RequestResponse extends ServerObsMessage:
 	var response_data: Dictionary
 
 	func parse(data: Dictionary) -> int:
-		var err := .parse(data)
+		var err := super.parse(data)
 		if err != OK:
 			return err
 
@@ -369,7 +350,8 @@ class RequestStatus:
 	var comment: String
 
 	func _to_string() -> String:
-		return JSON.print({
+		var json := JSON.new()
+		return json.stringify({
 			"result": result,
 			"code": code,
 			"comment": comment
@@ -393,17 +375,15 @@ class RequestStatus:
 
 #region RequestBatch
 
+## FROM client TO obs
+##
+## Requests are processed in order by obs-websocket. requests is an array of dictionaries
+##
+## halt_on_failure and execution_type are technically optional
+##
+## When halt_on_failure is true, the RequestBatchResponse will only contain the successfully
+## processed requests
 class RequestBatch extends ClientObsMessage:
-	"""
-	FROM client
-	TO obs
-
-	Requests are processed in order by obs-websocket. requests is an array of dictionaries
-
-	halt_on_failure and execution_type are technically optional
-
-	When halt_on_failure is true, the RequestBatchResponse will contain only the successfully processed requests
-	"""
 	var request_id: String
 	var halt_on_failure: bool
 	var execution_type: int
@@ -421,13 +401,10 @@ class RequestBatch extends ClientObsMessage:
 		execution_type = p_execution_type
 		requests = p_requests
 
+## FROM obs TO client
+##
+## results is an array of dictionaries
 class RequestBatchResponse extends ServerObsMessage:
-	"""
-	FROM obs
-	TO client
-
-	results is an array of dictionaries
-	"""
 	const REQUEST_ID := "requestId"
 	const RESULTS := "results"
 
@@ -435,7 +412,7 @@ class RequestBatchResponse extends ServerObsMessage:
 	var results: Array
 
 	func parse(data: Dictionary) -> int:
-		var err := .parse(data)
+		var err := super.parse(data)
 		if err != OK:
 			return err
 
@@ -798,12 +775,9 @@ const URL_PATH: String = "ws://%s:%s"
 const POLL_TIME: float = 1.0
 var poll_counter: float = 0.0
 
+## Util class pulled out of my Logger implementation so that obs_websocket.gd can be used
+## completely standalone
 class Logger:
-	"""
-	Util class pulled out of my usual Logger implementation so that
-	obs_websocket.gd can be used completely standalone
-	"""
-
 	signal message_logged(message)
 
 	enum LogType { NONE, INFO, DEBUG, TRACE, ERROR }
@@ -812,12 +786,12 @@ class Logger:
 
 	var is_setup := false
 
-	func _init(v = null) -> void:
+	func _init(v = null):
 		if v != null:
 			setup(v)
 
 	func _log(message: String, log_type: int) -> void:
-		var datetime: Dictionary = OS.get_datetime()
+		var datetime: Dictionary = Time.get_datetime_dict_from_system()
 		message = "%s %s-%s-%s_%s:%s:%s %s" % [
 			parent_name,
 			datetime["year"],
@@ -843,7 +817,7 @@ class Logger:
 						message, i, data["source"], data["line"], data["function"]]
 			LogType.ERROR:
 				message = "[ERROR] %s" % message
-				assert(false, message)
+				assert(false) #,message)
 	
 		print(message)
 		emit_signal("message_logged", message)
@@ -885,9 +859,9 @@ var logger = Logger.new()
 
 var obs_client := WebSocketClient.new()
 
-export var host: String = "127.0.0.1"
-export var port: String = "4444"
-export var password: String = "password" # It's plaintext lmao, you should be changing this programmatically
+@export var host: String = "127.0.0.1"
+@export var port: String = "4444"
+@export var password: String = "password" # It's plaintext lmao, you should be changing this programmatically
 
 var last_command: String = "n/a"
 var waiting_for_response := false
@@ -899,12 +873,12 @@ var waiting_for_response := false
 func _ready() -> void:
 	logger.setup(self)
 
-	obs_client.connect("connection_closed", self, "_on_connection_closed")
-	obs_client.connect("connection_error", self, "_on_connection_error")
-	obs_client.connect("connection_established", self, "_on_connection_established")
-	# obs_client.connect("data_received", self, "_on_data_received")
-	obs_client.connect("data_received", self, "_on_hello_received")
-	obs_client.connect("server_close_request", self, "_on_server_close_request")
+	obs_client.connect("connection_closed",Callable(self,"_on_connection_closed"))
+	obs_client.connect("connection_error",Callable(self,"_on_connection_error"))
+	obs_client.connect("connection_established",Callable(self,"_on_connection_established"))
+	# obs_client.connect("data_received",Callable(self,"_on_data_received"))
+	obs_client.connect("data_received",Callable(self,"_on_hello_received"))
+	obs_client.connect("server_close_request",Callable(self,"_on_server_close_request"))
 	
 	obs_client.verify_ssl = false
 
@@ -934,7 +908,7 @@ func _on_hello_received() -> void:
 	logger.debug("hello received")
 	
 	var message: Dictionary = _get_message()
-	if message.empty():
+	if message.is_empty():
 		logger.error("Invalid hello message, aborting")
 		return
 
@@ -942,24 +916,25 @@ func _on_hello_received() -> void:
 	hello.parse(message)
 	
 	if hello.op != 0:
-		logger.error("Unexpected op code from obs-websocket: %s\nAborting connection" % JSON.print(
-			hello.get_as_json(), "\t"))
+		var json := JSON.new()
+		logger.error("Unexpected op code from obs-websocket: %s\nAborting connection" %
+			json.stringify(hello.get_as_json(), "\t"))
 		return
 	
-	obs_client.disconnect("data_received", self, "_on_hello_received")
-	obs_client.connect("data_received", self, "_on_identified_received")
+	obs_client.disconnect("data_received",Callable(self,"_on_hello_received"))
+	obs_client.connect("data_received",Callable(self,"_on_identified_received"))
 	_identify(hello)
 
 func _on_identified_received() -> void:
 	logger.debug("identified received")
 	
 	var message: Dictionary = _get_message()
-	if message.empty():
+	if message.is_empty():
 		logger.error("Invalid identified message, aborting")
 		return
 	
-	obs_client.disconnect("data_received", self, "_on_identified_received")
-	obs_client.connect("data_received", self, "_on_data_received")
+	obs_client.disconnect("data_received",Callable(self,"_on_identified_received"))
+	obs_client.connect("data_received",Callable(self,"_on_data_received"))
 	
 	emit_signal("obs_authenticated")
 	
@@ -968,7 +943,7 @@ func _on_identified_received() -> void:
 func _on_data_received() -> void:
 	var message: Dictionary = _get_message()
 	
-	if message.empty() or not message.has("op"):
+	if message.is_empty() or not message.has("op"):
 		logger.error("Invalid data received, bailing out")
 		return
 
@@ -1022,7 +997,9 @@ func _on_server_close_request(code: int, reason: String) -> void:
 func _get_message() -> Dictionary:
 	var message: String = obs_client.get_peer(1).get_packet().get_string_from_utf8().strip_edges()
 
-	var json_result: JSONParseResult = JSON.parse(message)
+	var test_json_conv = JSON.new()
+	test_json_conv.parse(message)
+	var json_result: JSON = test_json_conv.get_data()
 	if json_result.error != OK:
 		logger.error("Unable to parse Hello from obs-websocket: %s\nAborting connection" % message)
 		return {}
@@ -1034,7 +1011,7 @@ func _get_message() -> Dictionary:
 
 	return result
 
-func _send_message(data: PoolByteArray) -> void:
+func _send_message(data: PackedByteArray) -> void:
 	obs_client.get_peer(1).put_packet(data)
 
 static func _generate_auth(password: String, challenge: String, salt: String) -> String:
@@ -1050,7 +1027,7 @@ func _identify(hello: Hello, flags: int = 33) -> void:
 		RPC_VERSION,
 		_generate_auth(password, hello.authentication.challenge, hello.authentication.salt))
 
-	_send_message(identify.get_as_json(true).to_utf8())
+	_send_message(identify.get_as_json(true).to_utf8_buffer())
 
 ###############################################################################
 # Public functions                                                            #
@@ -1069,7 +1046,7 @@ func send_command(command: String, data: Dictionary = {}) -> void:
 	
 	var req := Request.new(command, "1", data)
 	
-	_send_message(req.get_as_json().to_utf8())
+	_send_message(req.get_as_json().to_utf8_buffer())
 
 func get_error_name(error: int) -> String:
 	return Error.keys()[error]

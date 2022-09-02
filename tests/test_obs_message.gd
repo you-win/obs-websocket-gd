@@ -109,10 +109,12 @@ func test_obs_message_get_as_json():
 
 	assert_eq(m0.parse(good_data0), OK)
 
-	var data := JSON.parse(m0.get_as_json())
+	var test_json_conv = JSON.new()
+	test_json_conv.parse(m0.get_as_json())
+	var data := test_json_conv.get_data()
 	assert_eq(data.error, OK)
 
 	var m1 := ObsMessage.new()
 
 	assert_eq(m1.parse(data.result), OK)
-	assert_true(m1.d.empty())
+	assert_true(m1.d.is_empty())

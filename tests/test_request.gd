@@ -43,4 +43,4 @@ func test_request_pass():
 
 	assert_eq(r1.request_type, "some type")
 	assert_eq(r1.request_id, "id i guess")
-	assert_true(r1.request_data.empty())
+	assert_true(r1.request_data.is_empty())

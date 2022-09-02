@@ -103,21 +103,21 @@ func test_parse_pass():
 	assert_eq(e1.parse(good1), OK)
 	assert_eq(e1.event_type, "some event")
 	assert_eq(e1.event_intent, 100)
-	assert_true(e1.event_data.empty())
+	assert_true(e1.event_data.is_empty())
 
 	var e2 := Event.new()
 
 	assert_eq(e2.parse(good2), OK)
 	assert_eq(e2.event_type, "some event")
 	assert_eq(e2.event_intent, 100)
-	assert_true(e2.event_data.empty())
+	assert_true(e2.event_data.is_empty())
 
 	var e3 := Event.new()
 
 	assert_eq(e3.parse(good3), OK)
 	assert_eq(e3.event_type, "pew")
 	assert_eq(e3.event_intent, 100)
-	assert_true(e3.event_data.empty())
+	assert_true(e3.event_data.is_empty())
 
 func test_parse_fail():
 	var e0 := Event.new()
