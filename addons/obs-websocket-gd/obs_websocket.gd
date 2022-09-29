@@ -860,7 +860,7 @@ var logger = Logger.new()
 var obs_client := WebSocketClient.new()
 
 @export var host: String = "127.0.0.1"
-@export var port: String = "4444"
+@export var port: String = "4455"
 @export var password: String = "password" # It's plaintext lmao, you should be changing this programmatically
 
 var last_command: String = "n/a"
@@ -880,7 +880,7 @@ func _ready() -> void:
 	obs_client.connect("data_received",Callable(self,"_on_hello_received"))
 	obs_client.connect("server_close_request",Callable(self,"_on_server_close_request"))
 	
-	obs_client.verify_ssl = false
+	obs_client.verify_tls = false
 
 func _process(delta: float) -> void:
 	poll_counter += delta
@@ -998,13 +998,12 @@ func _get_message() -> Dictionary:
 	var message: String = obs_client.get_peer(1).get_packet().get_string_from_utf8().strip_edges()
 
 	var test_json_conv = JSON.new()
-	test_json_conv.parse(message)
-	var json_result: JSON = test_json_conv.get_data()
-	if json_result.error != OK:
+	var error: Error = test_json_conv.parse(message)
+	if error != OK:
 		logger.error("Unable to parse Hello from obs-websocket: %s\nAborting connection" % message)
 		return {}
 
-	var result = json_result.result
+	var result =  test_json_conv.get_data()
 	if typeof(result) != TYPE_DICTIONARY:
 		logger.error("Unexpected data from obs-websocket: %s\nAborting connection" % str(result))
 		return {}
