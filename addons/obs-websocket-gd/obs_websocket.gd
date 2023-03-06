@@ -918,12 +918,21 @@ func _process(delta: float) -> void:
 ###############################################################################
 # Connections                                                                 #
 ###############################################################################
+func _reset_connection():
+	if obs_client.is_connected("data_received", self, "_on_identified_received"):
+		obs_client.disconnect("data_received", self, "_on_identified_received")
+	if obs_client.is_connected("data_received", self, "_on_data_received"):
+		obs_client.disconnect("data_received", self, "_on_data_received")
+	if not obs_client.is_connected("data_received", self, "_on_hello_received"):
+		obs_client.connect("data_received", self, "_on_hello_received")
 
 func _on_connection_closed(_was_clean_close: bool) -> void:
 	logger.info("OBS connection closed")
+	_reset_connection()
 
 func _on_connection_error() -> void:
 	logger.info("OBS connection error")
+	_reset_connection()
 
 func _on_connection_established(protocol: String) -> void:
 	logger.info("OBS connection established with protocol: %s" % protocol)
