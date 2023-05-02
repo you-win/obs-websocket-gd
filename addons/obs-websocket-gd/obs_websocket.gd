@@ -775,13 +775,6 @@ signal connection_authenticated()
 signal connection_closed()
 signal data_received(data: ObsMessage)
 
-enum State {
-	HELLO,
-	IDENTIFY,
-	READY
-}
-var state: State = State.HELLO
-
 const URL_PATH: String = "ws://%s:%s"
 
 var obs_client := WebSocketPeer.new()
@@ -793,9 +786,6 @@ var _poll_handler := _handle_hello
 @export var host: String = "127.0.0.1"
 @export var port: String = "4455"
 @export var password: String = "password" # It's plaintext lmao, you should be changing this programmatically
-
-var last_command: String = "n/a"
-var waiting_for_response := false
 
 ###############################################################################
 # Builtin functions                                                           #
@@ -815,7 +805,7 @@ func _process(delta: float) -> void:
 				while obs_client.get_available_packet_count():
 					var err: Error = _poll_handler.call()
 					if err != OK:
-						printerr(get_error_name(err))
+						printerr(err)
 					
 			WebSocketPeer.STATE_CLOSED:
 				print_debug("Connection closed!")
@@ -889,7 +879,7 @@ func _handle_data_received() -> Error:
 	
 	var data: ServerObsMessage = null
 	
-	match message.op:
+	match int(message.op):
 		OpCodeEnums.WebSocketOpCode.Hello.IDENTIFIER_VALUE:
 			print("Hello op code received again, this is weird: ", message)
 			data = Hello.new()
@@ -946,13 +936,6 @@ func break_connection(reason: String = "") -> void:
 	obs_client.close(1000, reason)
 
 func send_command(command: String, data: Dictionary = {}) -> void:
-	if waiting_for_response:
-		print_debug("Still waiting for response for last command")
-		return
-	
 	var req := Request.new(command, "1", data)
 	
 	_send_message(req.get_as_json().to_utf8_buffer())
-
-func get_error_name(error: int) -> String:
-	return ObsError.keys()[error]
