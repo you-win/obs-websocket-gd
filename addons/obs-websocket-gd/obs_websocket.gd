@@ -3,7 +3,7 @@ extends Node
 signal obs_authenticated()
 signal obs_data_received(data)
 
-enum Error {
+enum ObsError {
 	NONE = 0,
 	
 	MISSING_OP_CODE,
@@ -86,9 +86,9 @@ class ObsMessage:
 		d = data.get(D, {})
 
 		if not data.has(OP):
-			return Error.MISSING_OP_CODE
+			return ObsError.MISSING_OP_CODE
 		if not data.has(D):
-			return Error.MISSING_DATA
+			return ObsError.MISSING_DATA
 
 		return OK
 
@@ -130,7 +130,7 @@ class ClientObsMessage extends ObsMessage:
 	func parse(_data: Dictionary) -> int:
 		printerr(NO_NEED_TO_PARSE)
 		
-		return Error.NO_NEED_TO_PARSE
+		return ObsError.NO_NEED_TO_PARSE
 
 class ServerObsMessage extends ObsMessage:
 	func parse(data: Dictionary) -> int:
@@ -156,9 +156,9 @@ class Hello extends ServerObsMessage:
 			return err
 
 		if not d.has(OBS_WEBSOCKET_VERSION):
-			err = Error.MISSING_HELLO_OBS_WEBSOCKET_VERSION
+			err = ObsError.MISSING_HELLO_OBS_WEBSOCKET_VERSION
 		if not d.has(RPC_VERSION):
-			err = Error.MISSING_HELLO_RPC_VERSION
+			err = ObsError.MISSING_HELLO_RPC_VERSION
 
 		obs_websocket_version = d.get(OBS_WEBSOCKET_VERSION, "")
 		rpc_version = d.get(RPC_VERSION, -1)
@@ -190,9 +190,9 @@ class Authentication:
 		var err: int = OK
 
 		if not data.has(CHALLENGE):
-			err = Error.MISSING_AUTHENTICATION_CHALLENGE
+			err = ObsError.MISSING_AUTHENTICATION_CHALLENGE
 		if not data.has(SALT):
-			err = Error.MISSING_AUTHENTICATION_SALT
+			err = ObsError.MISSING_AUTHENTICATION_SALT
 
 		challenge = data.get(CHALLENGE, "")
 		salt = data.get(SALT, "")
@@ -230,7 +230,7 @@ class Identified extends ServerObsMessage:
 			return err
 
 		if not d.has(NEGOTIATED_RPC_VERSION):
-			err = Error.MISSING_IDENTIFIED_NEGOTIATED_RPC_VERSION
+			err = ObsError.MISSING_IDENTIFIED_NEGOTIATED_RPC_VERSION
 
 		negotiated_rpc_version = d.get(NEGOTIATED_RPC_VERSION, -1)
 
@@ -270,16 +270,16 @@ class Event extends ServerObsMessage:
 			return err
 
 		if not d.has(EVENT_TYPE):
-			err = Error.MISSING_EVENT_TYPE
+			err = ObsError.MISSING_EVENT_TYPE
 		if not d.has(EVENT_INTENT):
-			err = Error.MISSING_EVENT_INTENT
+			err = ObsError.MISSING_EVENT_INTENT
 
 		event_type = d.get(EVENT_TYPE, "")
 		event_intent = d.get(EVENT_INTENT, -1)
 		event_data = d.get(EVENT_DATA, {})
 
 		if typeof(event_data) != TYPE_DICTIONARY:
-			err = Error.UNEXPECTED_EVENT_DATA_TYPE
+			err = ObsError.UNEXPECTED_EVENT_DATA_TYPE
 
 		return err
 
@@ -322,9 +322,9 @@ class RequestResponse extends ServerObsMessage:
 			return err
 
 		if not d.has(REQUEST_TYPE):
-			err = Error.MISSING_REQUEST_TYPE
+			err = ObsError.MISSING_REQUEST_TYPE
 		if not d.has(REQUEST_ID):
-			err = Error.MISSING_REQUEST_ID
+			err = ObsError.MISSING_REQUEST_ID
 		# if not d.has(REQUEST_STATUS): # TODO this appears to be optional for some requests
 		# 	err = Error.MISSING_REQUEST_STATUS
 
@@ -361,9 +361,9 @@ class RequestStatus:
 		var err: int = OK
 
 		if not data.has(RESULT):
-			err = Error.MISSING_REQUEST_STATUS_RESULT
+			err = ObsError.MISSING_REQUEST_STATUS_RESULT
 		if not data.has(CODE):
-			err = Error.MISSING_REQUEST_STATUS_CODE
+			err = ObsError.MISSING_REQUEST_STATUS_CODE
 		
 		result = data.get(RESULT, false)
 		code = data.get(CODE, -1)
@@ -417,9 +417,9 @@ class RequestBatchResponse extends ServerObsMessage:
 			return err
 
 		if not d.has(REQUEST_ID):
-			err = Error.MISSING_REQUEST_BATCH_RESPONSE_REQUEST_ID
+			err = ObsError.MISSING_REQUEST_BATCH_RESPONSE_REQUEST_ID
 		if not d.has(RESULTS):
-			err = Error.MISSING_REQUEST_BATCH_RESPONSE_RESULTS
+			err = ObsError.MISSING_REQUEST_BATCH_RESPONSE_RESULTS
 
 		request_id = d.get(REQUEST_ID, "")
 		results = d.get(RESULTS, [])
@@ -770,94 +770,26 @@ const OpCodeEnums := {
 
 #endregion
 
+signal connection_established()
+signal connection_authenticated()
+signal connection_closed()
+signal connection_error(error_message: String)
+signal data_received(data: ObsMessage)
+
+enum State {
+	HELLO,
+	IDENTIFY,
+	READY
+}
+var state: State = State.HELLO
+
 const URL_PATH: String = "ws://%s:%s"
 
-const POLL_TIME: float = 1.0
-var poll_counter: float = 0.0
+var obs_client := WebSocketPeer.new()
 
-## Util class pulled out of my Logger implementation so that obs_websocket.gd can be used
-## completely standalone
-class Logger:
-	signal message_logged(message)
-
-	enum LogType { NONE, INFO, DEBUG, TRACE, ERROR }
-
-	var parent_name: String = "DEFAULT_LOGGER"
-
-	var is_setup := false
-
-	func _init(v = null):
-		if v != null:
-			setup(v)
-
-	func _log(message: String, log_type: int) -> void:
-		var datetime: Dictionary = Time.get_datetime_dict_from_system()
-		message = "%s %s-%s-%s_%s:%s:%s %s" % [
-			parent_name,
-			datetime["year"],
-			datetime["month"],
-			datetime["day"],
-			datetime["hour"],
-			datetime["minute"],
-			datetime["second"],
-			message
-		]
-		
-		match log_type:
-			LogType.INFO:
-				message = "[INFO] %s" % message
-			LogType.DEBUG:
-				message = "[DEBUG] %s" % message
-			LogType.TRACE:
-				message = "[TRACE] %s" % message
-				var stack_trace: Array = get_stack()
-				for i in stack_trace.size() - 2:
-					var data: Dictionary = stack_trace[i + 2]
-					message = "%s\n\t%d - %s:%d - %s" % [
-						message, i, data["source"], data["line"], data["function"]]
-			LogType.ERROR:
-				message = "[ERROR] %s" % message
-				assert(false) #,message)
-	
-		print(message)
-		emit_signal("message_logged", message)
-
-	func setup(n) -> void:
-		"""
-		Initialize the logger with the containing object name. Prefer user-defined values but
-		also try to intelligently get the calling object name as well
-		"""
-		if is_setup:
-			return
-		
-		if typeof(n) == TYPE_STRING:
-			parent_name = n
-		elif n.get_script():
-			parent_name = n.get_script().resource_path.get_file()
-		elif n.get("name"):
-			parent_name = n.name
-		else:
-			trace("Unable to setup logger using var: %s" % str(n))
-		
-		is_setup = true
-	
-	func info(message: String) -> void:
-		_log(message, LogType.INFO)
-	
-	func debug(message: String) -> void:
-		if OS.is_debug_build():
-			_log(message, LogType.DEBUG)
-	
-	func trace(message: String) -> void:
-		if OS.is_debug_build():
-			_log(message, LogType.TRACE)
-	
-	func error(message: String) -> void:
-		_log(message, LogType.ERROR)
-
-var logger = Logger.new()
-
-var obs_client := WebSocketClient.new()
+@export var poll_time: float = 1.0
+var _poll_counter: float = 0.0
+var _poll_handler := _handle_hello
 
 @export var host: String = "127.0.0.1"
 @export var port: String = "4455"
@@ -871,147 +803,134 @@ var waiting_for_response := false
 ###############################################################################
 
 func _ready() -> void:
-	logger.setup(self)
+	set_process(false)
 
-	obs_client.connect("connection_closed",Callable(self,"_on_connection_closed"))
-	obs_client.connect("connection_error",Callable(self,"_on_connection_error"))
-	obs_client.connect("connection_established",Callable(self,"_on_connection_established"))
-	# obs_client.connect("data_received",Callable(self,"_on_data_received"))
-	obs_client.connect("data_received",Callable(self,"_on_hello_received"))
-	obs_client.connect("server_close_request",Callable(self,"_on_server_close_request"))
-	
-	obs_client.verify_tls = false
+#	obs_client.connect("connection_closed",Callable(self,"_on_connection_closed"))
+#	obs_client.connect("connection_error",Callable(self,"_on_connection_error"))
+#	obs_client.connect("connection_established",Callable(self,"_on_connection_established"))
+#	# obs_client.connect("data_received",Callable(self,"_on_data_received"))
+#	obs_client.connect("data_received",Callable(self,"_on_hello_received"))
+#	obs_client.connect("server_close_request",Callable(self,"_on_server_close_request"))
 
 func _process(delta: float) -> void:
-	poll_counter += delta
-	if poll_counter >= POLL_TIME:
-		poll_counter = 0.0
-		if obs_client.get_connection_status() != WebSocketClient.CONNECTION_DISCONNECTED:
-			obs_client.poll()
-
-###############################################################################
-# Connections                                                                 #
-###############################################################################
-
-func _on_connection_closed(_was_clean_close: bool) -> void:
-	logger.info("OBS connection closed")
-
-func _on_connection_error() -> void:
-	logger.info("OBS connection error")
-
-func _on_connection_established(protocol: String) -> void:
-	logger.info("OBS connection established with protocol: %s" % protocol)
-	
-	obs_client.get_peer(1).set_write_mode(WebSocketPeer.WRITE_MODE_TEXT)
-
-func _on_hello_received() -> void:
-	logger.debug("hello received")
-	
-	var message: Dictionary = _get_message()
-	if message.is_empty():
-		logger.error("Invalid hello message, aborting")
-		return
-
-	var hello := Hello.new()
-	hello.parse(message)
-	
-	if hello.op != 0:
-		var json := JSON.new()
-		logger.error("Unexpected op code from obs-websocket: %s\nAborting connection" %
-			json.stringify(hello.get_as_json(), "\t"))
-		return
-	
-	obs_client.disconnect("data_received",Callable(self,"_on_hello_received"))
-	obs_client.connect("data_received",Callable(self,"_on_identified_received"))
-	_identify(hello)
-
-func _on_identified_received() -> void:
-	logger.debug("identified received")
-	
-	var message: Dictionary = _get_message()
-	if message.is_empty():
-		logger.error("Invalid identified message, aborting")
-		return
-	
-	obs_client.disconnect("data_received",Callable(self,"_on_identified_received"))
-	obs_client.connect("data_received",Callable(self,"_on_data_received"))
-	
-	emit_signal("obs_authenticated")
-	
-	logger.info("Connected to obs-websocket")
-
-func _on_data_received() -> void:
-	var message: Dictionary = _get_message()
-	
-	if message.is_empty() or not message.has("op"):
-		logger.error("Invalid data received, bailing out")
-		return
-
-	var data: ServerObsMessage
-	var err: int = Error.NONE
-	
-	match int(message.op):
-		0:
-			logger.info("Hello opcode received again, this is weird\n%s" % str(message))
-			data = Hello.new()
-			err = data.parse(message)
-			if err != OK:
-				logger.error(get_error_name(err))
-		1, 3, 6, 8:
-			logger.error("Invalid opcode received\n%s" % str(message))
-			return
-		2:
-			logger.info("Identified opcode received again, this is weird\n%s" % str(message))
-			data = Identified.new()
-			err = data.parse(message)
-			if err != OK:
-				logger.error(get_error_name(err))
-		5:
-			data = Event.new()
-			err = data.parse(message)
-			if err != OK:
-				logger.error(get_error_name(err))
-		7:
-			data = RequestResponse.new()
-			err = data.parse(message)
-			if err != OK:
-				logger.error(get_error_name(err))
-		9:
-			data = RequestBatchResponse.new()
-			err = data.parse(message)
-			if err != OK:
-				logger.error(get_error_name(err))
-		_:
-			logger.error("Unhandled opcode received\n%s" % str(message))
-
-	emit_signal("obs_data_received", data)
-
-func _on_server_close_request(code: int, reason: String) -> void:
-	logger.info("OBS close request %d received with reason: %s" % [code, reason])
-	obs_client.disconnect_from_host()
+	_poll_counter += delta
+	if _poll_counter >= poll_time:
+		_poll_counter = 0.0
+		match obs_client.get_ready_state():
+			WebSocketPeer.STATE_OPEN, WebSocketPeer.STATE_CONNECTING, WebSocketPeer.STATE_CLOSING:
+				obs_client.poll()
+				
+				while obs_client.get_available_packet_count():
+					var err: Error = _poll_handler.call()
+					if err != OK:
+						printerr(get_error_name(err))
+					
+			WebSocketPeer.STATE_CLOSED:
+				print_debug("Connection closed!")
+				
+				connection_closed.emit()
+				set_process(false)
 
 ###############################################################################
 # Private functions                                                           #
 ###############################################################################
 
+func _handle_hello() -> Error:
+	print_debug("hello received")
+	
+	var message := _get_message()
+	if message.is_empty():
+		printerr("Unable to handle hello message from obs-websocket")
+		return ERR_CANT_CONNECT
+	
+	var hello := Hello.new()
+	if hello.parse(message) != OK:
+		printerr("Unable to handle Hello message from obs-websocket")
+		return ERR_PARSE_ERROR
+	
+	if hello.op != OpCodeEnums.WebSocketOpCode.Hello.IDENTIFIER_VALUE:
+		printerr("Unexpected op code from obs-websocket: ", hello.get_as_json())
+		return ERR_CONNECTION_ERROR
+	
+	_poll_handler = _handle_identify
+	
+	var identify := Identify.new(
+		RPC_VERSION,
+		_generate_auth(password, hello.authentication.challenge, hello.authentication.salt)
+	)
+	
+	_send_message(identify.get_as_json(true).to_utf8_buffer())
+	
+	return OK
+
+func _handle_identify() -> Error:
+	print_debug("identify received")
+	
+	var message := _get_message()
+	if message.is_empty():
+		printerr("Unable to handle Identify message from obs-websocket")
+		return ERR_CANT_CONNECT
+	
+	if OS.is_debug_build():
+		var identified := Identified.new()
+		if identified.parse(message) != OK:
+			printerr("Unable to parse Identified message from obs-websocket")
+			return ERR_PARSE_ERROR
+		
+		if identified.op != OpCodeEnums.WebSocketOpCode.Identified.IDENTIFIER_VALUE:
+			printerr("Unexpected op code from obs-websocket: ", identified.get_as_json())
+			return ERR_CONNECTION_ERROR
+	
+	connection_authenticated.emit()
+	
+	_poll_handler = _handle_data_received
+	
+	return OK
+
+func _handle_data_received() -> Error:
+	var message := _get_message()
+	if message.is_empty() or not message.has("op"):
+		printerr("Invalid data received, bailing out: ", message)
+		return ERR_INVALID_DATA
+	
+	var data: ServerObsMessage = null
+	
+	match message.op:
+		OpCodeEnums.WebSocketOpCode.Hello.IDENTIFIER_VALUE:
+			print("Hello op code received again, this is weird: ", message)
+			data = Hello.new()
+		OpCodeEnums.WebSocketOpCode.Identified.IDENTIFIER_VALUE:
+			print("Idenfied op code received again, this is weird: ", message)
+			data = Identified.new()
+		OpCodeEnums.WebSocketOpCode.Event.IDENTIFIER_VALUE:
+			data = Event.new()
+		OpCodeEnums.WebSocketOpCode.RequestResponse.IDENTIFIER_VALUE:
+			data = RequestResponse.new()
+		OpCodeEnums.WebSocketOpCode.RequestBatchResponse.IDENTIFIER_VALUE:
+			data = RequestBatchResponse.new()
+		_:
+			printerr("Unhandled message: ", message)
+			return ERR_INVALID_DATA
+	
+	var err := data.parse(message)
+	if err != OK:
+		return err
+	
+	data_received.emit(data)
+	
+	return OK
+
 func _get_message() -> Dictionary:
-	var message: String = obs_client.get_peer(1).get_packet().get_string_from_utf8().strip_edges()
-
-	var test_json_conv = JSON.new()
-	var error: Error = test_json_conv.parse(message)
-	if error != OK:
-		logger.error("Unable to parse Hello from obs-websocket: %s\nAborting connection" % message)
+	var json: Variant = JSON.parse_string(obs_client.get_packet().get_string_from_utf8())
+	if not json is Dictionary:
+		printerr("Unexpected data from obs-websocket: %s\nAborting connection" % str(json))
 		return {}
-
-	var result =  test_json_conv.get_data()
-	if typeof(result) != TYPE_DICTIONARY:
-		logger.error("Unexpected data from obs-websocket: %s\nAborting connection" % str(result))
-		return {}
-
-	return result
+	
+	return json as Dictionary
 
 func _send_message(data: PackedByteArray) -> void:
-	obs_client.get_peer(1).put_packet(data)
+	# TODO even though a text session is never requested, obs-websocket assumes a text session?
+	obs_client.send(data, WebSocketPeer.WRITE_MODE_TEXT)
 
 static func _generate_auth(password: String, challenge: String, salt: String) -> String:
 	var combined_secret := "%s%s" % [password, salt]
@@ -1019,28 +938,22 @@ static func _generate_auth(password: String, challenge: String, salt: String) ->
 	var combined_auth := "%s%s" % [base64_secret, challenge]
 	return Marshalls.raw_to_base64(combined_auth.sha256_buffer())
 
-func _identify(hello: Hello, flags: int = 33) -> void:
-	logger.info("Responding to Hello with Identify")
-	
-	var identify := Identify.new(
-		RPC_VERSION,
-		_generate_auth(password, hello.authentication.challenge, hello.authentication.salt))
-
-	_send_message(identify.get_as_json(true).to_utf8_buffer())
-
 ###############################################################################
 # Public functions                                                            #
 ###############################################################################
 
 func establish_connection() -> int:
-	return obs_client.connect_to_url(URL_PATH % [host, port], ["obswebsocket.json"])
+	print_debug("Establishing connection")
+	
+	set_process(true)
+	return obs_client.connect_to_url(URL_PATH % [host, port], TLSOptions.client())
 
-func break_connection() -> void:
-	obs_client.disconnect_from_host()
+func break_connection(reason: String = "") -> void:
+	obs_client.close(1000, reason)
 
 func send_command(command: String, data: Dictionary = {}) -> void:
 	if waiting_for_response:
-		logger.info("Still waiting for response for last command")
+		print_debug("Still waiting for response for last command")
 		return
 	
 	var req := Request.new(command, "1", data)
@@ -1048,4 +961,4 @@ func send_command(command: String, data: Dictionary = {}) -> void:
 	_send_message(req.get_as_json().to_utf8_buffer())
 
 func get_error_name(error: int) -> String:
-	return Error.keys()[error]
+	return ObsError.keys()[error]
