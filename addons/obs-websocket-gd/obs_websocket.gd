@@ -773,7 +773,6 @@ const OpCodeEnums := {
 signal connection_established()
 signal connection_authenticated()
 signal connection_closed()
-signal connection_error(error_message: String)
 signal data_received(data: ObsMessage)
 
 enum State {
@@ -804,13 +803,6 @@ var waiting_for_response := false
 
 func _ready() -> void:
 	set_process(false)
-
-#	obs_client.connect("connection_closed",Callable(self,"_on_connection_closed"))
-#	obs_client.connect("connection_error",Callable(self,"_on_connection_error"))
-#	obs_client.connect("connection_established",Callable(self,"_on_connection_established"))
-#	# obs_client.connect("data_received",Callable(self,"_on_data_received"))
-#	obs_client.connect("data_received",Callable(self,"_on_hello_received"))
-#	obs_client.connect("server_close_request",Callable(self,"_on_server_close_request"))
 
 func _process(delta: float) -> void:
 	_poll_counter += delta
@@ -858,6 +850,8 @@ func _handle_hello() -> Error:
 		RPC_VERSION,
 		_generate_auth(password, hello.authentication.challenge, hello.authentication.salt)
 	)
+	
+	connection_established.emit()
 	
 	_send_message(identify.get_as_json(true).to_utf8_buffer())
 	
