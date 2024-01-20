@@ -1,7 +1,5 @@
 # ![](obs_godot_icon.png) OBS Websocket GD
 
-[![Chat on Discord](https://img.shields.io/discord/853476898071117865?label=chat&logo=discord)](https://discord.gg/6mcdWWBkrr)
-
 A Godot addon to interact with [obs-websocket](https://github.com/Palakis/obs-websocket). Tested on Godot 4.0.2.
 
 ## Game/App Quickstart
