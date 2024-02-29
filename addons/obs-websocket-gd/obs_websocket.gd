@@ -91,12 +91,14 @@ class ObsMessage:
 			return ObsError.MISSING_DATA
 
 		return OK
-
-	func get_as_json(skip_empty: bool = false) -> String:
+		
+	func to_dict(skip_empty: bool = false, submessage: bool = false) -> Dictionary:
 		var json := {"d": {}}
 		for i in get_property_list():
 			var prop_name: String = i["name"]
-			if prop_name in ["Object", "RefCounted", "script", "Script Variables", "d"]:
+			if prop_name in ["Object", "RefCounted", "script", "Script Variables", "d", "Built-in script"]:
+				continue
+			if prop_name == "request_id" and submessage:
 				continue
 			
 			var prop = get(prop_name)
@@ -113,6 +115,20 @@ class ObsMessage:
 			if should_skip:
 				continue
 			
+			var translate = func (p):
+				if p is ObsMessage:
+					return p.to_dict(skip_empty, true)
+				return p
+			
+			match typeof(prop):
+				TYPE_ARRAY:
+					prop = (prop as Array).map(translate)
+				TYPE_DICTIONARY:
+					var mapped = {}
+					for key in prop:
+						mapped[key] = translate.call(prop[key])
+					prop = mapped
+			
 			var split_name: PackedStringArray = prop_name.split("_")
 			prop_name = split_name[0]
 			for s in range(1, split_name.size()):
@@ -122,6 +138,13 @@ class ObsMessage:
 				json[prop_name] = prop
 			else:
 				json["d"][prop_name] = prop
+		
+		if submessage:
+			return json["d"]
+		return json
+
+	func get_as_json(skip_empty: bool = false) -> String:
+		var json := to_dict(skip_empty)
 		
 		var json_obj := JSON.new()
 		return json_obj.stringify(json, "\t")
@@ -787,11 +810,18 @@ var _poll_handler := _handle_hello
 @export var port: String = "4455"
 @export var password: String = "password" # It's plaintext lmao, you should be changing this programmatically
 
+const COMMAND_CHUNK_SIZE = 10 # generally safe amount of commands to include in a batch
+var _command_buffer = []
+
 ###############################################################################
 # Builtin functions                                                           #
 ###############################################################################
 
 func _ready() -> void:
+	# since OBS supports a batching API, increase the buffer limit to 1mb
+	obs_client.outbound_buffer_size = 1048576
+	obs_client.inbound_buffer_size = 1048576
+	
 	set_process(false)
 
 func _process(delta: float) -> void:
@@ -806,6 +836,20 @@ func _process(delta: float) -> void:
 					var err: Error = _poll_handler.call()
 					if err != OK:
 						printerr(err)
+				
+				if !_command_buffer.is_empty():
+					
+					# process buffer in chunks to avoid running out of memory in the outbound buffer
+					if len(_command_buffer) > 1:
+						for i in range(0, len(_command_buffer), COMMAND_CHUNK_SIZE):
+							var chunk := _command_buffer.slice(i, i + COMMAND_CHUNK_SIZE)
+							var msg := RequestBatch.new("1", chunk)
+							_send_message(msg)
+					else:
+						var msg := _command_buffer.front()
+						_send_message(msg)
+							
+					_command_buffer = []
 					
 			WebSocketPeer.STATE_CLOSED:
 				print_debug("Connection closed!")
@@ -843,7 +887,7 @@ func _handle_hello() -> Error:
 	
 	connection_established.emit()
 	
-	_send_message(identify.get_as_json(true).to_utf8_buffer())
+	_send_message(identify)
 	
 	return OK
 
@@ -912,9 +956,10 @@ func _get_message() -> Dictionary:
 	
 	return json as Dictionary
 
-func _send_message(data: PackedByteArray) -> void:
+func _send_message(data: ClientObsMessage) -> void:
 	# TODO even though a text session is never requested, obs-websocket assumes a text session?
-	obs_client.send(data, WebSocketPeer.WRITE_MODE_TEXT)
+	var json = data.get_as_json(true)
+	obs_client.send_text(json)
 
 static func _generate_auth(password: String, challenge: String, salt: String) -> String:
 	var combined_secret := "%s%s" % [password, salt]
@@ -938,4 +983,4 @@ func break_connection(reason: String = "") -> void:
 func send_command(command: String, data: Dictionary = {}) -> void:
 	var req := Request.new(command, "1", data)
 	
-	_send_message(req.get_as_json().to_utf8_buffer())
+	_command_buffer.append(req)
