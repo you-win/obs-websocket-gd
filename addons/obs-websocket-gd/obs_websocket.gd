@@ -446,6 +446,17 @@ class RequestBatchResponse extends ServerObsMessage:
 
 		request_id = d.get(REQUEST_ID, "")
 		results = d.get(RESULTS, [])
+		
+		results = results.map(
+			func (r):
+				var resp := RequestResponse.new()
+				resp.parse({
+					OP: OpCodeEnums.WebSocketOpCode.RequestResponse.IDENTIFIER_VALUE,
+					D: r
+				})
+				resp.request_id = request_id
+				return resp
+		)
 
 		return err
 
@@ -811,7 +822,7 @@ var _poll_handler := _handle_hello
 @export var password: String = "password" # It's plaintext lmao, you should be changing this programmatically
 
 const COMMAND_CHUNK_SIZE = 10 # generally safe amount of commands to include in a batch
-var _command_buffer = []
+var _command_buffer: Dictionary = {}
 
 ###############################################################################
 # Builtin functions                                                           #
@@ -840,16 +851,18 @@ func _process(delta: float) -> void:
 				if !_command_buffer.is_empty():
 					
 					# process buffer in chunks to avoid running out of memory in the outbound buffer
-					if len(_command_buffer) > 1:
-						for i in range(0, len(_command_buffer), COMMAND_CHUNK_SIZE):
-							var chunk := _command_buffer.slice(i, i + COMMAND_CHUNK_SIZE)
-							var msg := RequestBatch.new("1", chunk)
+					for rid in _command_buffer.keys():
+						if len(_command_buffer) > 1:
+								var buf: Array = _command_buffer[rid]
+								for i in range(0, len(buf), COMMAND_CHUNK_SIZE):
+									var chunk := buf.slice(i, i + COMMAND_CHUNK_SIZE)
+									var msg := RequestBatch.new(rid, chunk)
+									_send_message(msg)
+						else:
+							var msg: Request = _command_buffer[rid].front()
 							_send_message(msg)
-					else:
-						var msg := _command_buffer.front()
-						_send_message(msg)
 							
-					_command_buffer = []
+					_command_buffer = {}
 					
 			WebSocketPeer.STATE_CLOSED:
 				print_debug("Connection closed!")
@@ -922,7 +935,7 @@ func _handle_data_received() -> Error:
 		return ERR_INVALID_DATA
 	
 	var data: ServerObsMessage = null
-	
+	var is_batch: bool = false
 	match int(message.op):
 		OpCodeEnums.WebSocketOpCode.Hello.IDENTIFIER_VALUE:
 			print("Hello op code received again, this is weird: ", message)
@@ -936,6 +949,7 @@ func _handle_data_received() -> Error:
 			data = RequestResponse.new()
 		OpCodeEnums.WebSocketOpCode.RequestBatchResponse.IDENTIFIER_VALUE:
 			data = RequestBatchResponse.new()
+			is_batch = true
 		_:
 			printerr("Unhandled message: ", message)
 			return ERR_INVALID_DATA
@@ -944,7 +958,11 @@ func _handle_data_received() -> Error:
 	if err != OK:
 		return err
 	
-	data_received.emit(data)
+	if is_batch:
+		for msg in data.results:
+			data_received.emit(msg)
+	else:
+		data_received.emit(data)
 	
 	return OK
 
@@ -980,7 +998,17 @@ func establish_connection() -> int:
 func break_connection(reason: String = "") -> void:
 	obs_client.close(1000, reason)
 
-func send_command(command: String, data: Dictionary = {}) -> void:
-	var req := Request.new(command, "1", data)
+## Queues a message to be sent to OBS.  Messages are automatically buffered into a batch request.
+## 
+## OBS Websocket uses request ids to establish a handshake for requests and responses.  Batches share request ids across commands.
+## You can supply a unique request id for use cases that you need to recognize the handshake.
+func send_command(command: String, data: Dictionary = {}, request_id = "1") -> String:
+	var req := Request.new(command, request_id, data)
 	
-	_command_buffer.append(req)
+	# batches share request id instead of getting a unique request per command, 
+	# we need to create individual buffers per request id
+	var buf := _command_buffer.get(request_id, [])
+	buf.append(req)
+	_command_buffer[request_id] = buf
+	
+	return request_id
